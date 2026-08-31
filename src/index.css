@@ -3,15 +3,18 @@
    stays out of their way. Landscape, two-handed, thumbs at the bottom corners. */
 
 :root {
-  --bg: #0b0f14;
-  --surface: #141a22;
-  --surface-2: #1c242e;
-  --surface-3: #26303c;
-  --line: rgb(255 255 255 / 0.09);
-  --line-strong: rgb(255 255 255 / 0.18);
-  --fg: #e8edf3;
-  --fg-dim: #93a1b1;
-  --fg-faint: #5d6b7a;
+  /* The in-match screen wants to be dark so the team colors carry it, but the setup
+     screens are read at arm's length in a gym and were too close to the background to
+     separate. The ramp below lifts every surface and the two muted text tones. */
+  --bg: #0e131a;
+  --surface: #1d2836;
+  --surface-2: #2a3746;
+  --surface-3: #3a4859;
+  --line: rgb(255 255 255 / 0.14);
+  --line-strong: rgb(255 255 255 / 0.26);
+  --fg: #eef2f7;
+  --fg-dim: #aab8c8;
+  --fg-faint: #8494a5;
   --danger: #ff6b6b;
   --warn: #f0b429;
   --ok: #4ade80;
@@ -106,8 +109,8 @@ button {
   font: inherit;
   padding: 0.6rem 0.7rem;
   border-radius: var(--r-sm);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
   color: var(--fg);
   min-width: 0;
 }
@@ -198,7 +201,10 @@ button {
 
 .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--pad); align-items: start; }
 .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.9rem; }
-.pair { display: grid; grid-template-columns: 1fr 90px; gap: 0.4rem; }
+/* An official's name plus an OHSAA number does not fit one grid track. */
+.field.official { grid-column: span 2; }
+.pair { display: grid; grid-template-columns: 1fr 108px; gap: 0.4rem; }
+@media (max-width: 720px) { .field.official { grid-column: span 1; } }
 
 .team-editor { display: grid; gap: 0.75rem; }
 .team-editor > header {
@@ -232,11 +238,20 @@ button {
 .color-well input { position: absolute; inset: -6px; opacity: 0; cursor: pointer; }
 
 .add-player { display: grid; grid-template-columns: 68px 1fr auto; gap: 0.4rem; }
-.add-player input { font: inherit; padding: 0.55rem 0.6rem; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--line); color: var(--fg); min-width: 0; }
+.add-player input { font: inherit; padding: 0.55rem 0.6rem; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--fg); min-width: 0; }
 .add-player input:focus { outline: 2px solid var(--line-strong); outline-offset: -1px; }
 
 .roster-hint { font-size: 0.82rem; margin: 0; }
-.roster { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 260px; overflow-y: auto; }
+/* position: relative so a row's offsetTop is measured against the list itself.
+   Scrolling is deliberately not smooth: `scrollTop +=` reads a mid-animation value
+   while a smooth scroll is in flight, so the target comes out short and the new row
+   stays clipped — the exact problem this is meant to solve. */
+.roster { list-style: none; margin: 0; padding: 0; position: relative; display: grid; gap: 2px; max-height: 360px; overflow-y: auto; }
+.roster li.just-added { animation: flash-in 1.1s ease-out; }
+@keyframes flash-in {
+  from { background: var(--surface-3); }
+  to { background: transparent; }
+}
 .roster li { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.4rem; border-radius: var(--r-sm); }
 .roster li:hover { background: var(--surface-2); }
 .roster li.libero b { border-radius: 3px; }

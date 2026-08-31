@@ -1,14 +1,14 @@
 import { useState } from 'react'
 
 import { referencedNumbers } from './model/reducer'
-import { OTHER, type MatchSetup, type SetStarted } from './model/types'
+import { OTHER, type MatchSetup, type SetStarted, type TeamSide } from './model/types'
 import { useMatchStore } from './state/store'
 import Closeout from './ui/Closeout'
 import Home from './ui/Home'
 import Scoresheet from './ui/Scoresheet'
 import InMatch from './ui/InMatch'
 import MatchSetupScreen from './ui/MatchSetup'
-import SetSetupScreen, { type SetDefaults } from './ui/SetSetup'
+import SetSetupScreen, { type SetDraft } from './ui/SetSetup'
 
 type Route =
   | 'home'
@@ -25,11 +25,7 @@ const EMPTY_LINEUP: (string | null)[] = [null, null, null, null, null, null]
  * Defaults for the next set. Lineups default to the previous set's, since they often
  * do not change; first serve alternates; a deciding fifth set plays to 15.
  */
-function setDefaults(
-  setup: MatchSetup,
-  events: SetStarted[],
-  setNumber: number,
-): SetDefaults {
+function setDefaults(setup: MatchSetup, events: SetStarted[], setNumber: number): SetDraft {
   const last = events[events.length - 1]
   const deciding = setup.format === 'best_of_5' && setNumber === 5
   return {
@@ -46,8 +42,31 @@ function setDefaults(
   }
 }
 
+/**
+ * Fold an edited setup back into a half-entered lineup. Players who left the roster or
+ * became liberos come out of the lineup; newly designated liberos join the set, which
+ * is usually the reason the operator went to edit the teams mid-setup. Everything else
+ * is left exactly as it was entered.
+ */
+function reconcileDraft(draft: SetDraft, setup: MatchSetup): SetDraft {
+  const lineups = { ...draft.lineups }
+  const liberos = { ...draft.liberos }
+  for (const side of ['home', 'visitor'] as TeamSide[]) {
+    const roster = new Set(setup[side].roster.map((p) => p.number))
+    const nextLiberos = [
+      ...new Set([...draft.liberos[side], ...setup[side].liberoNumbers]),
+    ].filter((n) => roster.has(n))
+    liberos[side] = nextLiberos
+    lineups[side] = draft.lineups[side].map((n) =>
+      n && roster.has(n) && !nextLiberos.includes(n) ? n : null,
+    )
+  }
+  return { ...draft, lineups, liberos }
+}
+
 export default function App() {
   const store = useMatchStore()
+  const [draft, setDraft] = useState<SetDraft | null>(null)
   // `null` means the operator has not navigated yet, so the route is derived from the
   // match itself. Resuming an in-progress match on launch is therefore not an effect
   // and never costs a second render.
@@ -123,6 +142,8 @@ export default function App() {
           onCancel={() => setRoute(back)}
           onStart={async (setup) => {
             await store.updateSetup(setup)
+            // Keep whatever lineup was already entered rather than starting over.
+            setDraft((d) => (d ? reconcileDraft(d, setup) : d))
             setRoute(back)
           }}
         />
@@ -137,18 +158,27 @@ export default function App() {
     )
 
     if (view === 'setSetup') {
+      // The draft is kept only while it belongs to the set about to be played; once a
+      // set starts or ends, the derived defaults take over again.
+      const setNumber = state.completedSets.length + 1
+      const active =
+        draft?.setNumber === setNumber
+          ? draft
+          : setDefaults(record.setup, priorSets, setNumber)
       return (
         <div className="app">
           <SetSetupScreen
             setup={record.setup}
             setsWon={state.setsWon}
-            defaults={setDefaults(record.setup, priorSets, state.completedSets.length + 1)}
+            draft={active}
+            onDraftChange={setDraft}
             onBack={() => setRoute('home')}
             onEditSetup={() => setRoute('editSetup')}
             onSheet={() => setRoute('sheet')}
             onCloseout={() => setRoute('closeout')}
             onStart={(body) => {
               store.append(body)
+              setDraft(null)
               setRoute('inMatch')
             }}
           />

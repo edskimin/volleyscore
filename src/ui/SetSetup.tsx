@@ -2,7 +2,11 @@ import { useMemo, useState } from 'react'
 
 import { ROMAN, type EventBody, type MatchSetup, type TeamSide } from '../model/types'
 
-export interface SetDefaults {
+/**
+ * The in-progress set setup. This lives in App rather than in this component: going to
+ * edit the teams unmounts this screen, and a half-entered lineup must survive the trip.
+ */
+export interface SetDraft {
   setNumber: number
   lineups: Record<TeamSide, (string | null)[]>
   firstServe: TeamSide
@@ -13,7 +17,8 @@ export interface SetDefaults {
 
 interface Props {
   setup: MatchSetup
-  defaults: SetDefaults
+  draft: SetDraft
+  onDraftChange: (next: SetDraft) => void
   setsWon: Record<TeamSide, number>
   onBack: () => void
   onEditSetup: () => void
@@ -42,6 +47,7 @@ function LineupEditor({
 
   // A libero cannot be a starter; she replaces someone already on court.
   const assignable = team.roster.filter((p) => !liberos.includes(p.number))
+  const designated = team.roster.filter((p) => team.liberoNumbers.includes(p.number))
 
   function tapPlayer(number: string) {
     if (selected === null) return
@@ -93,20 +99,18 @@ function LineupEditor({
         })}
       </div>
 
-      {team.roster.some((p) => setup[side].liberoNumbers.includes(p.number)) && (
+      {designated.length > 0 && (
         <div className="libero-row">
           <span className="eyebrow">Libero this set</span>
-          {team.roster
-            .filter((p) => setup[side].liberoNumbers.includes(p.number))
-            .map((p) => (
-              <button
-                key={p.number}
-                className={`chip libero${liberos.includes(p.number) ? ' on' : ''}`}
-                onClick={() => onToggleLibero(p.number)}
-              >
-                <span className="num">{p.number}</span>
-              </button>
-            ))}
+          {designated.map((p) => (
+            <button
+              key={p.number}
+              className={`chip libero${liberos.includes(p.number) ? ' on' : ''}`}
+              onClick={() => onToggleLibero(p.number)}
+            >
+              <span className="num">{p.number}</span>
+            </button>
+          ))}
         </div>
       )}
     </section>
@@ -115,7 +119,8 @@ function LineupEditor({
 
 export default function SetSetupScreen({
   setup,
-  defaults,
+  draft,
+  onDraftChange,
   setsWon,
   onBack,
   onEditSetup,
@@ -123,16 +128,8 @@ export default function SetSetupScreen({
   onCloseout,
   onStart,
 }: Props) {
-  const [lineups, setLineups] = useState(defaults.lineups)
-  const [liberos, setLiberos] = useState(defaults.liberos)
-  const [firstServe, setFirstServe] = useState(defaults.firstServe)
-  const [targetScore, setTargetScore] = useState(defaults.targetScore)
-  const [sidesSwitched, setSidesSwitched] = useState(defaults.sidesSwitched)
-
-  // A decided match still offers another set, in case the result needs correcting,
-  // but closing out is the primary action once it is.
-  const needed = setup.format === 'best_of_5' ? 3 : 2
-  const matchDecided = Math.max(setsWon.home, setsWon.visitor) >= needed
+  const { lineups, liberos, firstServe, targetScore, sidesSwitched } = draft
+  const patch = (p: Partial<SetDraft>) => onDraftChange({ ...draft, ...p })
 
   const complete = useMemo(
     () =>
@@ -143,35 +140,39 @@ export default function SetSetupScreen({
     [lineups],
   )
 
+  // A decided match still offers another set, in case the result needs correcting,
+  // but closing out is the primary action once it is.
+  const needed = setup.format === 'best_of_5' ? 3 : 2
+  const matchDecided = Math.max(setsWon.home, setsWon.visitor) >= needed
+
   function assign(side: TeamSide, slot: number, player: string | null) {
-    setLineups((prev) => {
-      const next = [...prev[side]]
-      next[slot] = player
-      return { ...prev, [side]: next }
-    })
+    const next = [...lineups[side]]
+    next[slot] = player
+    patch({ lineups: { ...lineups, [side]: next } })
   }
 
   function toggleLibero(side: TeamSide, player: string) {
-    setLiberos((prev) => {
-      const has = prev[side].includes(player)
-      const next = has ? prev[side].filter((n) => n !== player) : [...prev[side], player]
+    const has = liberos[side].includes(player)
+    patch({
+      liberos: {
+        ...liberos,
+        [side]: has ? liberos[side].filter((n) => n !== player) : [...liberos[side], player],
+      },
       // Designating a libero pulls her out of the starting six if she was placed there.
-      if (!has) assign(side, lineups[side].indexOf(player), null)
-      return { ...prev, [side]: next }
+      lineups: has
+        ? lineups
+        : { ...lineups, [side]: lineups[side].map((n) => (n === player ? null : n)) },
     })
   }
 
   function start() {
     onStart({
       type: 'SET_STARTED',
-      setNumber: defaults.setNumber,
+      setNumber: draft.setNumber,
       targetScore,
       firstServe,
       sidesSwitched,
-      lineups: {
-        home: lineups.home as string[],
-        visitor: lineups.visitor as string[],
-      },
+      lineups: { home: lineups.home as string[], visitor: lineups.visitor as string[] },
       liberoDesignated: liberos,
       startTime: new Date().toTimeString().slice(0, 5),
     })
@@ -184,7 +185,7 @@ export default function SetSetupScreen({
           ← Back
         </button>
         <h1>
-          Set {defaults.setNumber}
+          Set {draft.setNumber}
           {setsWon.home + setsWon.visitor > 0 && (
             <span className="muted num">
               {' '}
@@ -223,7 +224,7 @@ export default function SetSetupScreen({
               <button
                 key={side}
                 aria-pressed={firstServe === side}
-                onClick={() => setFirstServe(side)}
+                onClick={() => patch({ firstServe: side })}
               >
                 {setup[side].name || side}
               </button>
@@ -238,7 +239,7 @@ export default function SetSetupScreen({
                 key={n}
                 className="num"
                 aria-pressed={targetScore === n}
-                onClick={() => setTargetScore(n)}
+                onClick={() => patch({ targetScore: n })}
               >
                 {n}
               </button>
@@ -248,10 +249,13 @@ export default function SetSetupScreen({
         <div className="field">
           <label>Sides</label>
           <div className="seg">
-            <button aria-pressed={!sidesSwitched} onClick={() => setSidesSwitched(false)}>
+            <button
+              aria-pressed={!sidesSwitched}
+              onClick={() => patch({ sidesSwitched: false })}
+            >
               As set 1
             </button>
-            <button aria-pressed={sidesSwitched} onClick={() => setSidesSwitched(true)}>
+            <button aria-pressed={sidesSwitched} onClick={() => patch({ sidesSwitched: true })}>
               Switched
             </button>
           </div>

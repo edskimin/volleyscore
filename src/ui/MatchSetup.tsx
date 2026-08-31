@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MatchSetup, RosterPlayer, TeamSide, TeamSnapshot } from '../model/types'
 import { contrastRatio, readableOn } from './color'
@@ -43,6 +43,9 @@ function TeamEditor({
 }) {
   const [number, setNumber] = useState('')
   const [name, setName] = useState('')
+  const numberRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  const [added, setAdded] = useState<string | null>(null)
 
   function add() {
     const n = number.trim()
@@ -53,7 +56,27 @@ function TeamEditor({
     })
     setNumber('')
     setName('')
+    setAdded(n)
+    // Straight back to the number field, so a roster is entered without reaching for
+    // the input between every player.
+    numberRef.current?.focus()
   }
+
+  // The list is sorted numerically and scrolls, so a high number could land out of
+  // sight and read as though nothing happened. Bring it into view.
+  //
+  // The offset is computed rather than left to scrollIntoView, which lands a few
+  // pixels short here and leaves the new row clipped — the exact thing being fixed.
+  useEffect(() => {
+    if (added === null) return
+    const list = listRef.current
+    const el = list?.querySelector<HTMLElement>(`[data-number="${CSS.escape(added)}"]`)
+    if (!list || !el) return
+    const below = el.offsetTop + el.offsetHeight - (list.scrollTop + list.clientHeight)
+    const above = el.offsetTop - list.scrollTop
+    if (below > 0) list.scrollTop += below
+    else if (above < 0) list.scrollTop += above
+  }, [added, team.roster])
 
   function update(target: string, patch: Partial<RosterPlayer>) {
     onChange({
@@ -108,6 +131,7 @@ function TeamEditor({
 
       <div className="add-player">
         <input
+          ref={numberRef}
           className="num"
           inputMode="numeric"
           placeholder="#"
@@ -132,11 +156,17 @@ function TeamEditor({
           Numbers are required, names are not. The sheet only needs numbers.
         </p>
       ) : (
-        <ul className="roster">
+        <ul className="roster" ref={listRef}>
           {team.roster.map((p) => {
             const libero = team.liberoNumbers.includes(p.number)
             return (
-              <li key={p.number} className={libero ? 'libero' : undefined}>
+              <li
+                key={p.number}
+                data-number={p.number}
+                className={[libero ? 'libero' : '', added === p.number ? 'just-added' : '']
+                  .filter(Boolean)
+                  .join(' ')}
+              >
                 <b className="num">{p.number}</b>
                 <span className="pname muted">{p.name ?? '—'}</span>
                 <button
@@ -304,7 +334,7 @@ export default function MatchSetupScreen({
             placeholder="Optional"
           />
         </div>
-        <div className="field">
+        <div className="field official">
           <label>R1</label>
           <div className="pair">
             <input value={r1Name} onChange={(e) => setR1Name(e.target.value)} placeholder="Name" />
@@ -316,7 +346,7 @@ export default function MatchSetupScreen({
             />
           </div>
         </div>
-        <div className="field">
+        <div className="field official">
           <label>R2</label>
           <div className="pair">
             <input value={r2Name} onChange={(e) => setR2Name(e.target.value)} placeholder="Name" />
