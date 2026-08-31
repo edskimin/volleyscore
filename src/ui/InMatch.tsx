@@ -8,6 +8,7 @@ import {
   type CourtPosition,
   type DerivedState,
   type EventBody,
+  type MatchEvent,
   type MatchSetup,
   type SlotIndex,
   type TeamSide,
@@ -16,11 +17,13 @@ import {
 interface Props {
   setup: MatchSetup
   state: DerivedState
+  events: MatchEvent[]
   append: (...bodies: EventBody[]) => void
   undoLast: () => void
   canUndo: boolean
   onSheet: () => void
   onEditSetup: () => void
+  onCloseout: () => void
   onExport: () => void
   onHome: () => void
 }
@@ -46,11 +49,13 @@ type Selection =
 export default function InMatch({
   setup,
   state,
+  events,
   append,
   undoLast,
   canUndo,
   onSheet,
   onEditSetup,
+  onCloseout,
   onExport,
   onHome,
 }: Props) {
@@ -245,6 +250,28 @@ export default function InMatch({
         </div>
       </div>
 
+      {state.matchComplete && !events.some((e) => e.type === 'MATCH_ENDED') && (
+        <div className="set-end match-end">
+          <span>
+            {setup[state.setsWon.home > state.setsWon.visitor ? 'home' : 'visitor'].name} wins the
+            match{' '}
+            <b className="num">
+              {Math.max(state.setsWon.home, state.setsWon.visitor)}–
+              {Math.min(state.setsWon.home, state.setsWon.visitor)}
+            </b>
+          </span>
+          <button
+            className="btn primary"
+            onClick={() => {
+              append({ type: 'MATCH_ENDED', endTime: new Date().toTimeString().slice(0, 5) })
+              onCloseout()
+            }}
+          >
+            End match
+          </button>
+        </div>
+      )}
+
       {state.setComplete && state.setInProgress && (
         <div className="set-end">
           <span>
@@ -366,6 +393,16 @@ export default function InMatch({
                     }}
                   >
                     Export match
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => {
+                      onCloseout()
+                      setMenu(false)
+                    }}
+                  >
+                    Finish match…
                   </button>
                 </li>
               </ul>

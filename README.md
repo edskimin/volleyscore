@@ -61,10 +61,16 @@ IndexedDB on iOS is not durable storage — Safari can evict script-writable sto
 after roughly seven days without site interaction. The blocking closeout export is the
 real protection against losing a match, not the per-set backup store.
 
+**Dexie cannot change a store's primary key in an upgrade.** It throws `UpgradeError`,
+the database never opens, and every screen goes blank on any device that already ran
+the previous version. Adding an index is safe; changing the key is not. If a key ever
+genuinely has to change, create a new store and drop the old one. A failed open now
+renders an error screen rather than a blank page, but it is still fatal to scoring.
+
 ## Status
 
-Built: the reducer, the selection model, storage, and five of the seven screens —
-home, match setup, set setup, the in-match screen, and the scoresheet.
+Built: the reducer, the selection model, storage, and six of the seven screens —
+home, match setup, set setup, the in-match screen, the scoresheet, and closeout.
 
 The scoresheet is laid out in points against the real OHSAA form, whose geometry was
 measured out of the PDF's vector rules and is recorded in `02-scoresheet-notation.md`.
@@ -73,11 +79,17 @@ A print at 100% on landscape letter lands on the printed grid.
 Match setup stays editable for the life of a match, from the set setup screen or the
 in-match overflow menu. Players the event log already names cannot be removed.
 
+Closeout is blocking by design: a match cannot be marked complete until its log has
+been written out to a file. `exportedAt` on the match record is what gates it, so the
+block survives a reload rather than living in component state. The home screen flags
+any match that has never been exported.
+
 Not built yet:
 
 - Adjustment mode, so the overflow menu has no "Fix lineup" entry yet.
-- Match closeout, including the blocking export. Export is reachable from the overflow
-  menu in the meantime.
+- The prompt to install to the home screen (durability mitigation 2 in
+  `01-data-model.md`). Mitigations 1 and 3, the blocking export and the per-set
+  backup store, are both in place.
 
 One deliberate deviation from the spec: `SET_ENDED` is not emitted automatically when
 the win condition is met. A banner offers it instead, so a mis-tap on set point stays a

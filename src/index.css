@@ -486,3 +486,74 @@ button {
 
 .warnings { position: absolute; bottom: 4.5rem; left: 50%; transform: translateX(-50%); list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; z-index: 10; }
 .warnings li { background: var(--surface-2); border: 1px solid var(--warn); color: var(--warn); padding: 0.4rem 0.7rem; border-radius: var(--r-sm); font-size: 0.78rem; }
+
+/* --- Closeout ----------------------------------------------------------- */
+
+.closeout { max-width: 780px; margin: 0 auto; width: 100%; }
+.closeout h1 { font-size: 1.05rem; }
+.section-title { margin: 0 0 0.2rem; font-size: 0.95rem; font-weight: 600; }
+.muted.small { font-size: 0.82rem; margin: 0 0 0.7rem; }
+
+.result { display: grid; gap: 0.9rem; }
+.result-head { display: flex; align-items: baseline; gap: 0.5rem; font-size: 1.15rem; }
+.result-head b { font-weight: 650; }
+.result-head .big { font-size: 1.9rem; font-weight: 750; letter-spacing: -0.02em; }
+
+.sets { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.sets th {
+  text-align: left;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--fg-faint);
+  font-weight: 700;
+  padding-bottom: 0.35rem;
+}
+.sets td { padding: 0.35rem 0; border-top: 1px solid var(--line); }
+.sets td.num { font-weight: 600; }
+.sets td.won { color: var(--ok); font-weight: 800; }
+
+.export-gate { display: flex; align-items: center; gap: 1rem; border-color: var(--warn); }
+.export-gate.done { border-color: var(--line); }
+.gate-head { display: flex; gap: 0.8rem; flex: 1; align-items: flex-start; }
+.gate-mark {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  background: var(--warn);
+  color: #201700;
+}
+.export-gate.done .gate-mark { background: var(--ok); color: #04240f; }
+.export-gate h2 { margin: 0 0 0.2rem; font-size: 0.95rem; font-weight: 600; }
+.export-gate p { margin: 0; font-size: 0.83rem; max-width: 52ch; }
+
+.save-teams { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.save-teams .swatch { width: 12px; height: 12px; border-radius: 3px; display: block; }
+
+.closeout-actions { display: flex; align-items: center; gap: 0.8rem; padding-bottom: 1rem; }
+.closeout-actions .faint { font-size: 0.83rem; }
+.set-end.match-end { border-color: var(--ok); }
+.badge.warn { background: var(--warn); color: #201700; }
+.badge.quiet { background: var(--surface-3); color: var(--fg-dim); }
+
+.storage-error { max-width: 620px; margin: 0 auto; width: 100%; justify-content: center; }
+.storage-error .card { display: grid; gap: 0.7rem; }
+.storage-error h1 { margin: 0; font-size: 1.1rem; font-weight: 650; }
+.storage-error p { margin: 0; font-size: 0.88rem; }
+.storage-error pre {
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 0.78rem;
+  color: var(--danger);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+.storage-error .btn { justify-self: start; }

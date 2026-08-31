@@ -18,6 +18,7 @@ interface Props {
   onBack: () => void
   onEditSetup: () => void
   onSheet: () => void
+  onCloseout: () => void
   onStart: (body: EventBody) => void
 }
 
@@ -119,6 +120,7 @@ export default function SetSetupScreen({
   onBack,
   onEditSetup,
   onSheet,
+  onCloseout,
   onStart,
 }: Props) {
   const [lineups, setLineups] = useState(defaults.lineups)
@@ -126,6 +128,11 @@ export default function SetSetupScreen({
   const [firstServe, setFirstServe] = useState(defaults.firstServe)
   const [targetScore, setTargetScore] = useState(defaults.targetScore)
   const [sidesSwitched, setSidesSwitched] = useState(defaults.sidesSwitched)
+
+  // A decided match still offers another set, in case the result needs correcting,
+  // but closing out is the primary action once it is.
+  const needed = setup.format === 'best_of_5' ? 3 : 2
+  const matchDecided = Math.max(setsWon.home, setsWon.visitor) >= needed
 
   const complete = useMemo(
     () =>
@@ -194,7 +201,16 @@ export default function SetSetupScreen({
             Sheet
           </button>
         )}
-        <button className="btn primary lg" onClick={start} disabled={!complete}>
+        {matchDecided && (
+          <button className="btn primary lg" onClick={onCloseout}>
+            Finish match
+          </button>
+        )}
+        <button
+          className={matchDecided ? 'btn lg' : 'btn primary lg'}
+          onClick={start}
+          disabled={!complete}
+        >
           Start set
         </button>
       </div>

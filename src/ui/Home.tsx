@@ -96,6 +96,10 @@ export default function Home({ activeMatchId, onNew, onOpen }: Props) {
                   </span>
                   <span className="spacer" />
                   <span className="result num">{summarize(m)}</span>
+                  {/* Browser storage on iOS can be evicted; an unexported match has no
+                      copy that outlives it. */}
+                  {!m.exportedAt && <span className="badge warn">not exported</span>}
+                  {m.status === 'complete' && <span className="badge quiet">final</span>}
                   {active && <span className="badge">resume</span>}
                 </button>
               </li>

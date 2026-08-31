@@ -1,16 +1,23 @@
 import { useState } from 'react'
 
-import { shareExport } from './db/db'
 import { referencedNumbers } from './model/reducer'
 import { OTHER, type MatchSetup, type SetStarted } from './model/types'
 import { useMatchStore } from './state/store'
+import Closeout from './ui/Closeout'
 import Home from './ui/Home'
 import Scoresheet from './ui/Scoresheet'
 import InMatch from './ui/InMatch'
 import MatchSetupScreen from './ui/MatchSetup'
 import SetSetupScreen, { type SetDefaults } from './ui/SetSetup'
 
-type Route = 'home' | 'matchSetup' | 'editSetup' | 'setSetup' | 'inMatch' | 'sheet'
+type Route =
+  | 'home'
+  | 'matchSetup'
+  | 'editSetup'
+  | 'setSetup'
+  | 'inMatch'
+  | 'sheet'
+  | 'closeout'
 
 const EMPTY_LINEUP: (string | null)[] = [null, null, null, null, null, null]
 
@@ -48,14 +55,45 @@ export default function App() {
 
   if (store.loading) return <div className="app" />
 
-  const resumed: Route = store.record && store.state?.setInProgress ? 'inMatch' : 'setSetup'
-  let view: Route = route ?? (store.record ? resumed : 'home')
-  // A finished set drops back to set setup for the next one rather than dead-ending.
-  if (view === 'inMatch' && store.state && !store.state.setInProgress) view = 'setSetup'
-
-  async function exportMatch() {
-    if (store.record) await shareExport(store.record)
+  if (store.error) {
+    return (
+      <div className="app">
+        <div className="screen storage-error">
+          <div className="card">
+            <h1>Local storage is unavailable</h1>
+            <p className="muted">
+              The match database could not be opened, so nothing can be scored or read on
+              this device right now.
+            </p>
+            <pre>{store.error}</pre>
+            <p className="faint">
+              Any match already exported to a file is safe. Reloading may help; if it does
+              not, the app was likely updated in a way this device&rsquo;s database cannot
+              migrate.
+            </p>
+            <button className="btn primary" onClick={() => location.reload()}>
+              Reload
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
+
+  // Resuming: a live set goes back to the match, a decided match goes to closeout, and
+  // anything else goes to set setup. A decided match must not offer set 4.
+  const resumed: Route = store.state?.setInProgress
+    ? 'inMatch'
+    : store.state?.matchComplete
+      ? 'closeout'
+      : 'setSetup'
+  let view: Route = route ?? (store.record ? resumed : 'home')
+  // A finished set drops back to set setup for the next one rather than dead-ending;
+  // a finished match drops to closeout instead of offering a set that will not be played.
+  if (view === 'inMatch' && store.state && !store.state.setInProgress) {
+    view = store.state.matchComplete ? 'closeout' : 'setSetup'
+  }
+
 
   if (view === 'matchSetup') {
     return (
@@ -108,10 +146,29 @@ export default function App() {
             onBack={() => setRoute('home')}
             onEditSetup={() => setRoute('editSetup')}
             onSheet={() => setRoute('sheet')}
+            onCloseout={() => setRoute('closeout')}
             onStart={(body) => {
               store.append(body)
               setRoute('inMatch')
             }}
+          />
+        </div>
+      )
+    }
+
+    if (view === 'closeout') {
+      return (
+        <div className="app">
+          <Closeout
+            setup={record.setup}
+            state={state}
+            exportedAt={record.exportedAt}
+            onExport={store.exportMatch}
+            onComplete={async () => {
+              await store.complete()
+              setRoute('home')
+            }}
+            onBackToMatch={() => setRoute(state.setInProgress ? 'inMatch' : 'setSetup')}
           />
         </div>
       )
@@ -135,12 +192,14 @@ export default function App() {
           <InMatch
             setup={record.setup}
             state={state}
+            events={record.events}
             append={store.append}
             undoLast={store.undoLast}
             canUndo={store.canUndo}
             onSheet={() => setRoute('sheet')}
             onEditSetup={() => setRoute('editSetup')}
-            onExport={() => void exportMatch()}
+            onCloseout={() => setRoute('closeout')}
+            onExport={() => void store.exportMatch()}
             onHome={() => setRoute('home')}
           />
         </div>

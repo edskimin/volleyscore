@@ -16,6 +16,12 @@ export interface MatchRecord {
   createdAt: string
   updatedAt: string
   status: 'in_progress' | 'complete'
+  /**
+   * When the log was last written out to a file. A match is not complete until this
+   * is set: the blocking closeout export is the real protection against eviction,
+   * and a dismissible reminder would be dismissed.
+   */
+  exportedAt: string | null
   setup: MatchSetup
   events: MatchEvent[]
 }
@@ -33,8 +39,8 @@ export interface AppStateRecord {
 export interface BackupRecord {
   id?: number
   matchId: string
-  savedAt: string
   afterSet: number
+  savedAt: string
   payload: MatchExport
 }
 
@@ -50,6 +56,18 @@ db.version(1).stores({
   teams: 'teamId, name, lastUsedAt',
   appState: 'key',
   backups: '++id, matchId, savedAt',
+})
+
+db.version(2).stores({
+  // Adds a compound index so a backup can be found by match and set and replaced
+  // rather than accumulating one row per write.
+  //
+  // Note the primary key stays `++id`. Dexie cannot change a store's primary key in
+  // an upgrade: it throws UpgradeError, the database never opens, and every screen in
+  // the app goes blank on any device that already ran the previous version. Adding an
+  // index is safe; changing the key is not. If a key ever genuinely has to change,
+  // create a new store and drop the old one instead.
+  backups: '++id, matchId, savedAt, [matchId+afterSet]',
 })
 
 export { db }
@@ -75,6 +93,7 @@ export async function createMatch(setup: MatchSetup): Promise<MatchRecord> {
     createdAt: now,
     updatedAt: now,
     status: 'in_progress',
+    exportedAt: null,
     setup,
     events: [],
   }
@@ -186,6 +205,8 @@ export async function importMatch(json: string): Promise<MatchRecord> {
     createdAt: now,
     updatedAt: now,
     status: 'in_progress',
+    // An imported match came from a file, so it already exists outside this device.
+    exportedAt: now,
     setup: data.setup,
     events: data.events,
   }
@@ -195,10 +216,39 @@ export async function importMatch(json: string): Promise<MatchRecord> {
 
 /** Belt and braces against eviction: snapshot after every completed set. */
 export async function backupAfterSet(record: MatchRecord, afterSet: number): Promise<void> {
+  const existing = await db.backups
+    .where('[matchId+afterSet]')
+    .equals([record.matchId, afterSet])
+    .first()
   await db.backups.put({
+    ...(existing?.id === undefined ? {} : { id: existing.id }),
     matchId: record.matchId,
     savedAt: new Date().toISOString(),
     afterSet,
     payload: toExport(record),
   })
+}
+
+/** Records that the log has been written out, which is what unblocks completion. */
+export async function markExported(matchId: string): Promise<string> {
+  const exportedAt = new Date().toISOString()
+  await db.matches.update(matchId, { exportedAt, updatedAt: exportedAt })
+  return exportedAt
+}
+
+export async function markComplete(matchId: string): Promise<void> {
+  await db.matches.update(matchId, {
+    status: 'complete',
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+/**
+ * Save a team for reuse next time. This is a convenience copy: editing a saved team
+ * never mutates a match already recorded, because matches carry their own snapshot.
+ */
+export async function saveTeam(team: TeamSnapshot): Promise<string> {
+  const teamId = team.teamId ?? crypto.randomUUID()
+  await db.teams.put({ ...team, teamId, lastUsedAt: new Date().toISOString() })
+  return teamId
 }
