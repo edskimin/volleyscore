@@ -16,6 +16,8 @@ interface Props {
   defaults: SetDefaults
   setsWon: Record<TeamSide, number>
   onBack: () => void
+  onEditSetup: () => void
+  onSheet: () => void
   onStart: (body: EventBody) => void
 }
 
@@ -110,7 +112,15 @@ function LineupEditor({
   )
 }
 
-export default function SetSetupScreen({ setup, defaults, setsWon, onBack, onStart }: Props) {
+export default function SetSetupScreen({
+  setup,
+  defaults,
+  setsWon,
+  onBack,
+  onEditSetup,
+  onSheet,
+  onStart,
+}: Props) {
   const [lineups, setLineups] = useState(defaults.lineups)
   const [liberos, setLiberos] = useState(defaults.liberos)
   const [firstServe, setFirstServe] = useState(defaults.firstServe)
@@ -176,6 +186,14 @@ export default function SetSetupScreen({ setup, defaults, setsWon, onBack, onSta
           )}
         </h1>
         <div className="spacer" />
+        <button className="btn ghost" onClick={onEditSetup}>
+          Edit teams
+        </button>
+        {setsWon.home + setsWon.visitor > 0 && (
+          <button className="btn ghost" onClick={onSheet}>
+            Sheet
+          </button>
+        )}
         <button className="btn primary lg" onClick={start} disabled={!complete}>
           Start set
         </button>

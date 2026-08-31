@@ -10,6 +10,7 @@ import {
   createMatch,
   getActiveMatchId,
   saveEvents,
+  saveSetup,
   setActiveMatchId,
   db,
   type MatchRecord,
@@ -36,6 +37,8 @@ export interface MatchStore {
   undoLast: () => void
   canUndo: boolean
   start: (setup: MatchSetup) => Promise<void>
+  /** Edit team names, colors, officials and rosters after the match has begun. */
+  updateSetup: (setup: MatchSetup) => Promise<void>
   open: (matchId: string) => Promise<void>
   leave: () => Promise<void>
 }
@@ -99,6 +102,16 @@ export function useMatchStore(): MatchStore {
     [],
   )
 
+  const updateSetup = useCallback(async (setup: MatchSetup) => {
+    let id: string | null = null
+    setRecord((prev) => {
+      if (!prev) return prev
+      id = prev.matchId
+      return { ...prev, setup }
+    })
+    if (id) await saveSetup(id, setup)
+  }, [])
+
   const open = useCallback(async (matchId: string) => {
     const found = (await db.matches.get(matchId)) ?? null
     if (found) await setActiveMatchId(matchId)
@@ -118,6 +131,7 @@ export function useMatchStore(): MatchStore {
     undoLast,
     canUndo: (record?.events.length ?? 0) > 0,
     start,
+    updateSetup,
     open,
     leave,
   }

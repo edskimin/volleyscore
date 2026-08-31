@@ -338,3 +338,63 @@ describe('rotation pass floor', () => {
     expect(s.teams.visitor.rotationPass).toBe(0)
   })
 })
+
+describe('player number column', () => {
+  it('never records a libero, so the sheet prints the player she replaced', () => {
+    const events: MatchEvent[] = [setStarted('home', { home: ['30'], visitor: [] })]
+    events.push(
+      ev({
+        type: 'LIBERO_REPLACE',
+        team: 'home',
+        liberoNumber: '30',
+        direction: 'in',
+        slot: 4,
+        playerNumber: '15',
+      }),
+    )
+    const s = fold(setup(), events)
+    expect(s.teams.home.slots[4].current).toBe('30')
+    // The Libero # field carries her number; the Player Number column must not.
+    expect(s.teams.home.slots[4].sheetPlayers).toEqual(['15'])
+  })
+
+  it('accumulates substitutes in order, as the form expects', () => {
+    const events: MatchEvent[] = [setStarted('home')]
+    for (const [playerIn, playerOut] of [
+      ['2', '4'],
+      ['4', '2'],
+      ['2', '4'],
+    ]) {
+      events.push(
+        ev({ type: 'SUBSTITUTION', team: 'home', playerIn, playerOut, slot: 3, exceptional: false }),
+      )
+    }
+    expect(fold(setup(), events).teams.home.slots[3].sheetPlayers).toEqual(['4', '2', '4', '2'])
+  })
+})
+
+describe('libero back row', () => {
+  it('warns when a libero rotates into the front row without being replaced', () => {
+    // Home slot I holds the libero at court position 1. Home loses serve, sides out
+    // twice, and rotation carries her round to position 4.
+    const events: MatchEvent[] = [setStarted('home', { home: ['30'], visitor: [] })]
+    events.push(
+      ev({
+        type: 'LIBERO_REPLACE',
+        team: 'home',
+        liberoNumber: '30',
+        direction: 'in',
+        slot: 0,
+        playerNumber: '12',
+      }),
+    )
+    expect(fold(setup(), events).warnings).toEqual([])
+
+    // Each home side-out rotates her back one position: 1 -> 6 -> 5 -> 4.
+    for (let i = 0; i < 6; i++) events.push(rally(i % 2 === 0 ? 'visitor' : 'home'))
+    const s = fold(setup(), events)
+    const slot = s.teams.home.slots.find((x) => x.current === '30')
+    expect(slot?.position).toBe(4)
+    expect(s.warnings.some((w) => w.includes('front row'))).toBe(true)
+  })
+})

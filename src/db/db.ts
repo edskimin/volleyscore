@@ -88,6 +88,14 @@ export async function saveEvents(matchId: string, events: MatchEvent[]): Promise
   await db.matches.update(matchId, { events, updatedAt: new Date().toISOString() })
 }
 
+/**
+ * Setup is editable after a match starts: team colors, names, officials and roster
+ * additions. It is not part of the event log, so changing it never invalidates a fold.
+ */
+export async function saveSetup(matchId: string, setup: MatchSetup): Promise<void> {
+  await db.matches.update(matchId, { setup, updatedAt: new Date().toISOString() })
+}
+
 export async function listMatches(): Promise<MatchRecord[]> {
   return db.matches.orderBy('updatedAt').reverse().toArray()
 }

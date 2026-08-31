@@ -19,6 +19,8 @@ interface Props {
   append: (...bodies: EventBody[]) => void
   undoLast: () => void
   canUndo: boolean
+  onSheet: () => void
+  onEditSetup: () => void
   onExport: () => void
   onHome: () => void
 }
@@ -47,6 +49,8 @@ export default function InMatch({
   append,
   undoLast,
   canUndo,
+  onSheet,
+  onEditSetup,
   onExport,
   onHome,
 }: Props) {
@@ -284,6 +288,9 @@ export default function InMatch({
           <button className="btn" onClick={undoLast} disabled={!canUndo}>
             Undo
           </button>
+          <button className="btn" onClick={onSheet}>
+            Sheet
+          </button>
           <div className="menu-wrap">
             <button
               className="btn ghost"
@@ -339,6 +346,16 @@ export default function InMatch({
                     }}
                   >
                     End set manually
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => {
+                      onEditSetup()
+                      setMenu(false)
+                    }}
+                  >
+                    Edit teams &amp; setup
                   </button>
                 </li>
                 <li>

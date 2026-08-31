@@ -90,6 +90,7 @@ function startTeam(lineup: string[], liberos: string[], serving: boolean): TeamS
     position: initialPosition(i as SlotIndex, serving),
     current: number,
     history: [],
+    sheetPlayers: [number],
     liberoServeFlag: false,
   }))
   // Counting the first-serving team's opening turn is what keeps the two teams'
@@ -144,6 +145,23 @@ function checkLiberoServeLock(state: DerivedState, side: TeamSide): void {
   }
 }
 
+/**
+ * A libero may only play back row, so rotating into positions 2, 3 or 4 means the
+ * operator missed a replacement. Warn — the R2 makes the ruling, not the tablet — but
+ * do not block, because the log must still record what the app was told.
+ */
+function checkLiberoBackRow(state: DerivedState, side: TeamSide): void {
+  const team = state.teams[side]
+  if (!team.liberoOnCourt) return
+  const slot = team.slots.find((s) => s.current === team.liberoOnCourt)
+  if (slot && !BACK_ROW.includes(slot.position)) {
+    state.warnings.push(
+      `Libero #${team.liberoOnCourt} (${side}) rotated to court position ${slot.position}, ` +
+        `which is front row. She should have been replaced.`,
+    )
+  }
+}
+
 // --- Rally -----------------------------------------------------------------
 
 function setIsWon(state: DerivedState): boolean {
@@ -181,6 +199,7 @@ function applyRally(state: DerivedState, winner: TeamSide): void {
     recomputePass(w)
     state.serveTeam = winner
     checkLiberoServeLock(state, winner)
+    checkLiberoBackRow(state, winner)
 
     // A side-out point is won while receiving, so it can never be a libero point.
     appendMark(w, servingSlotIndex(w), {
@@ -263,6 +282,7 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
         if (slot) {
           slot.history.push(slot.current)
           slot.current = ev.playerIn
+          slot.sheetPlayers.push(ev.playerIn)
           team.exitSlot[ev.playerOut] = ev.slot
           delete team.exitSlot[ev.playerIn]
         }
@@ -354,6 +374,7 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
             if (slot && slot.current !== number) {
               slot.history.push(slot.current)
               slot.current = number
+              if (!team.liberoDesignated.includes(number)) slot.sheetPlayers.push(number)
             }
           }
         }
@@ -424,4 +445,64 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
 /** Undo is dropping the last event and re-folding. */
 export function undo(events: MatchEvent[]): MatchEvent[] {
   return events.slice(0, -1)
+}
+
+/** Set numbers that have been started, in order. */
+export function startedSets(events: MatchEvent[]): number[] {
+  return events.filter((e) => e.type === 'SET_STARTED').map((e) => e.setNumber)
+}
+
+/**
+ * The state as it stood at the end of a given set, so a finished set's sheet can be
+ * rendered long after play moved on.
+ *
+ * This works by folding a prefix of the log rather than by storing per-set snapshots:
+ * `SET_STARTED` already resets team state, so folding through a set's `SET_ENDED`
+ * leaves exactly that set's rows, players and marks in `teams`.
+ */
+export function foldThroughSet(
+  setup: MatchSetup,
+  events: MatchEvent[],
+  setNumber: number,
+): DerivedState | null {
+  const start = events.findIndex((e) => e.type === 'SET_STARTED' && e.setNumber === setNumber)
+  if (start < 0) return null
+  const ended = events.findIndex((e) => e.type === 'SET_ENDED' && e.setNumber === setNumber)
+  const through = ended < 0 ? events.length : ended + 1
+  return fold(setup, events.slice(0, through))
+}
+
+/**
+ * Jersey numbers the log already refers to, per team. Setup stays editable during a
+ * match, but removing a player the log names would leave the sheet unrenderable.
+ */
+export function referencedNumbers(events: MatchEvent[]): Record<TeamSide, Set<string>> {
+  const out: Record<TeamSide, Set<string>> = { home: new Set(), visitor: new Set() }
+  for (const ev of events) {
+    switch (ev.type) {
+      case 'SET_STARTED':
+        for (const side of ['home', 'visitor'] as TeamSide[]) {
+          for (const n of ev.lineups[side]) out[side].add(n)
+          for (const n of ev.liberoDesignated[side]) out[side].add(n)
+        }
+        break
+      case 'SUBSTITUTION':
+        out[ev.team].add(ev.playerIn)
+        out[ev.team].add(ev.playerOut)
+        break
+      case 'LIBERO_REPLACE':
+        out[ev.team].add(ev.liberoNumber)
+        out[ev.team].add(ev.playerNumber)
+        break
+      case 'ROSTER_ADD':
+        out[ev.team].add(ev.number)
+        break
+      case 'ADJUSTMENT':
+        if (ev.team && ev.slotAssignments) {
+          for (const n of Object.values(ev.slotAssignments)) out[ev.team].add(n)
+        }
+        break
+    }
+  }
+  return out
 }

@@ -63,14 +63,18 @@ real protection against losing a match, not the per-set backup store.
 
 ## Status
 
-Built: the reducer, the selection model, storage, and four of the seven screens —
-home, match setup, set setup, and the in-match screen.
+Built: the reducer, the selection model, storage, and five of the seven screens —
+home, match setup, set setup, the in-match screen, and the scoresheet.
+
+The scoresheet is laid out in points against the real OHSAA form, whose geometry was
+measured out of the PDF's vector rules and is recorded in `02-scoresheet-notation.md`.
+A print at 100% on landscape letter lands on the printed grid.
+
+Match setup stays editable for the life of a match, from the set setup screen or the
+in-match overflow menu. Players the event log already names cannot be removed.
 
 Not built yet:
 
-- The scoresheet render (`02-scoresheet-notation.md`). The reducer already produces
-  the marks; nothing draws them. The in-match screen has no "Sheet" button until it
-  does.
 - Adjustment mode, so the overflow menu has no "Fix lineup" entry yet.
 - Match closeout, including the blocking export. Export is reachable from the overflow
   menu in the meantime.

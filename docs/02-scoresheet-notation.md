@@ -6,7 +6,13 @@ likely to be subtly wrong, so each rule is tagged with its source confidence.
 ## Sources
 
 - **OHSAA Scoresheet PDF** (revised 1/15/15). The target form. Definitive for layout
-  and the symbol key.
+  and the symbol key. Its geometry has since been measured directly out of the PDF's
+  vector rules; see "Sheet geometry" below. **[confidence: high, measured]**
+- **VolleyWrite sample sheet** (Harding Academy v St. George's, 10/20/2016). A fully
+  marked set, useful for procedure: mark sequencing within a row, the `S 3/9` sub
+  notation, and the Player Number column accumulating occupants as `9, 3, 9, 3, 9`.
+  **Not an OHSAA form.** Its key gives a *square* for a point from loss of rally where
+  OHSAA gives a *circle*, so do not copy symbols from it.
 - **NFHS Tennessee High School Volleyball Scoresheet Guide** (Funk and Goodwin, 2010).
   A slide-by-slide walkthrough of a full set on the KHSAA form. Definitive for
   marking procedure. Note the KHSAA form differs from OHSAA in one symbol: KHSAA
@@ -43,7 +49,8 @@ Comments: ______________________________
 
 **Each serve order band is two rows of 10 boxes**, separated by a dotted rule. That
 is 20 boxes per band. Fill the top row left to right, then continue on the bottom
-row. **[confidence: high, confirmed from the OHSAA form]**
+row. **[confidence: high, measured from the OHSAA form: ten vertical rules at 28.1pt
+spacing across each band.]**
 
 The Player # column is split by the same dotted rule. The starter goes above,
 substitutes below. **[confidence: high]**
@@ -56,8 +63,24 @@ The floor captain is marked with a lowercase `c` after her number, for example
 
 ### Running score column
 
-Four narrow columns between the team blocks. Per team, two sub-columns: 1 to 16 and
-17 to 32. **[confidence: high, from the OHSAA form. KHSAA uses 1-20 and 21-40.]**
+**Two** columns between the team blocks, one per team, each 28.1pt wide. Within a
+column the numbers run 1 to 32 as a single vertical zigzag: 1 to 16 are left aligned
+and 17 to 32 are indented to the right, interleaved line by line, so the column reads
+
+```
+1
+      17
+2
+      18
+3
+      19
+```
+
+It looks like two sub-columns and behaves like two, but it is one table cell.
+**[confidence: high, measured from the OHSAA form.]**
+
+An earlier draft of this document described four narrow columns; that was wrong.
+KHSAA uses 1-20 and 21-40 and is a different form.
 
 ## The core principle
 
@@ -212,6 +235,51 @@ Cards and penalties are out of scope, so the standard card notations
 | Substitution Opponent | `SX` |
 | Libero Point | triangle |
 
+## Sheet geometry
+
+Measured from the rectangle fills in the OHSAA PDF's content stream. The page carries
+`/Rotate 90`, so display coordinates are the PDF's `(y, x)`. All values are points.
+
+Page 792 x 612 landscape. Content is inset to x 30.4 through 757.9, a width of 727.5.
+
+| Region | Width |
+|---|---|
+| Left team block | 335.5 |
+| Centre running score | 56.2 (two columns of 28.1) |
+| Right team block | 335.8 |
+
+Within a team block, left to right:
+
+| Column | Width |
+|---|---|
+| Serve order Roman numeral | 18.5 |
+| Player # | 36 |
+| Ten mark boxes | 28.1 each, 281 total |
+
+Every row in a block must sum to 335.5 or the header will not sit over the bands. The
+two header rows merge those columns as:
+
+| Row | Cells |
+|---|---|
+| First Serve / TEAM / Libero # | 54.5, 196.7, 84.3 |
+| Player # / Time Outs / box 1 / box 2 / rest | 54.5, 84.3, 28.1, 28.1, 140.5 |
+
+Vertically, from the top of the table at y 119.6:
+
+| Row | Height |
+|---|---|
+| Header row 1 | 21.6 |
+| Header row 2 | 14.4 |
+| Each of the six bands | 43.52 |
+| Substitutions | 14.4 |
+| Comments | 36 |
+
+Then the SET SUMMARY bar and its two lines, and the symbol key across the foot.
+
+Implementation note: express these as fixed flex bases with `box-sizing: border-box`,
+not as grow weights. With a zero basis each cell's own padding and border distort its
+share, and the columns drift by several points across a block.
+
 ## Printing
 
 Design as an HTML page with a print stylesheet targeting **landscape letter**.
@@ -224,6 +292,9 @@ the match; the laptop prints it after.
 
 - Whether a captain who enters as a substitute carries the `c` marking.
 - Exact geometry of the `-I` mark as hand-drawn.
-- Whether OHSAA expects the libero triangle in the running score column.
+- Whether OHSAA expects the libero triangle in the running score column. The app draws
+  it as a small triangle appended to the number rather than enclosing it, because the
+  running score column is only 28.1pt wide and an enclosing triangle collides with the
+  neighbouring line. The service rows do enclose it.
 - Behavior if a serve order band exceeds 20 boxes. Extremely unlikely, but decide
   whether to shrink boxes or overflow into the comments.

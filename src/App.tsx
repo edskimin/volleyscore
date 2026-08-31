@@ -1,14 +1,16 @@
 import { useState } from 'react'
 
 import { shareExport } from './db/db'
+import { referencedNumbers } from './model/reducer'
 import { OTHER, type MatchSetup, type SetStarted } from './model/types'
 import { useMatchStore } from './state/store'
 import Home from './ui/Home'
+import Scoresheet from './ui/Scoresheet'
 import InMatch from './ui/InMatch'
 import MatchSetupScreen from './ui/MatchSetup'
 import SetSetupScreen, { type SetDefaults } from './ui/SetSetup'
 
-type Route = 'home' | 'matchSetup' | 'setSetup' | 'inMatch'
+type Route = 'home' | 'matchSetup' | 'editSetup' | 'setSetup' | 'inMatch' | 'sheet'
 
 const EMPTY_LINEUP: (string | null)[] = [null, null, null, null, null, null]
 
@@ -69,6 +71,27 @@ export default function App() {
     )
   }
 
+  // Setup stays editable for the life of the match, because team colors are guessed
+  // before the teams warm up and the in-match screen depends on telling them apart.
+  if (view === 'editSetup' && store.record) {
+    const back = store.state?.setInProgress ? 'inMatch' : 'setSetup'
+    return (
+      <div className="app">
+        <MatchSetupScreen
+          initial={store.record.setup}
+          title="Edit teams & setup"
+          submitLabel="Save"
+          locked={referencedNumbers(store.record.events)}
+          onCancel={() => setRoute(back)}
+          onStart={async (setup) => {
+            await store.updateSetup(setup)
+            setRoute(back)
+          }}
+        />
+      </div>
+    )
+  }
+
   if (view !== 'home' && store.record && store.state) {
     const { record, state } = store
     const priorSets = record.events.filter(
@@ -83,10 +106,24 @@ export default function App() {
             setsWon={state.setsWon}
             defaults={setDefaults(record.setup, priorSets, state.completedSets.length + 1)}
             onBack={() => setRoute('home')}
+            onEditSetup={() => setRoute('editSetup')}
+            onSheet={() => setRoute('sheet')}
             onStart={(body) => {
               store.append(body)
               setRoute('inMatch')
             }}
+          />
+        </div>
+      )
+    }
+
+    if (view === 'sheet') {
+      return (
+        <div className="app">
+          <Scoresheet
+            setup={record.setup}
+            events={record.events}
+            onBack={() => setRoute(state.setInProgress ? 'inMatch' : 'setSetup')}
           />
         </div>
       )
@@ -101,6 +138,8 @@ export default function App() {
             append={store.append}
             undoLast={store.undoLast}
             canUndo={store.canUndo}
+            onSheet={() => setRoute('sheet')}
+            onEditSetup={() => setRoute('editSetup')}
             onExport={() => void exportMatch()}
             onHome={() => setRoute('home')}
           />

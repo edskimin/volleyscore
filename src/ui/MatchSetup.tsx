@@ -4,6 +4,12 @@ import type { MatchSetup, RosterPlayer, TeamSide, TeamSnapshot } from '../model/
 import { contrastRatio, readableOn } from './color'
 
 interface Props {
+  /** Present when editing an existing match rather than creating one. */
+  initial?: MatchSetup
+  title?: string
+  submitLabel?: string
+  /** Numbers the event log already names; these cannot be removed from a roster. */
+  locked?: Record<TeamSide, Set<string>>
   onCancel: () => void
   onStart: (setup: MatchSetup) => void
 }
@@ -27,10 +33,12 @@ function sortRoster(roster: RosterPlayer[]): RosterPlayer[] {
 function TeamEditor({
   team,
   label,
+  locked,
   onChange,
 }: {
   team: TeamSnapshot
   label: string
+  locked: Set<string>
   onChange: (next: TeamSnapshot) => void
 }) {
   const [number, setNumber] = useState('')
@@ -146,7 +154,12 @@ function TeamEditor({
                 >
                   L
                 </button>
-                <button className="tag remove" onClick={() => remove(p.number)} title="Remove">
+                <button
+                  className="tag remove"
+                  onClick={() => remove(p.number)}
+                  disabled={locked.has(p.number)}
+                  title={locked.has(p.number) ? 'Already used this match' : 'Remove'}
+                >
                   ×
                 </button>
               </li>
@@ -162,18 +175,27 @@ function TeamEditor({
   )
 }
 
-export default function MatchSetupScreen({ onCancel, onStart }: Props) {
-  const [home, setHome] = useState(() => blankTeam('', '#14284B'))
-  const [visitor, setVisitor] = useState(() => blankTeam('', '#7A1120'))
-  const [level, setLevel] = useState<MatchSetup['level']>('varsity')
-  const [format, setFormat] = useState<MatchSetup['format']>('best_of_5')
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [venue, setVenue] = useState('')
-  const [scorerName, setScorerName] = useState('')
-  const [r1Name, setR1Name] = useState('')
-  const [r1Number, setR1Number] = useState('')
-  const [r2Name, setR2Name] = useState('')
-  const [r2Number, setR2Number] = useState('')
+export default function MatchSetupScreen({
+  initial,
+  title = 'New match',
+  submitLabel = 'Continue',
+  locked,
+  onCancel,
+  onStart,
+}: Props) {
+  const [home, setHome] = useState(() => initial?.home ?? blankTeam('', '#14284B'))
+  const [visitor, setVisitor] = useState(() => initial?.visitor ?? blankTeam('', '#7A1120'))
+  const [level, setLevel] = useState<MatchSetup['level']>(initial?.level ?? 'varsity')
+  const [format, setFormat] = useState<MatchSetup['format']>(initial?.format ?? 'best_of_5')
+  const [date, setDate] = useState(
+    () => initial?.date ?? new Date().toISOString().slice(0, 10),
+  )
+  const [venue, setVenue] = useState(initial?.venue ?? '')
+  const [scorerName, setScorerName] = useState(initial?.scorerName ?? '')
+  const [r1Name, setR1Name] = useState(initial?.officials.r1Name ?? '')
+  const [r1Number, setR1Number] = useState(initial?.officials.r1Number ?? '')
+  const [r2Name, setR2Name] = useState(initial?.officials.r2Name ?? '')
+  const [r2Number, setR2Number] = useState(initial?.officials.r2Number ?? '')
 
   // The whole in-match design depends on telling the two panels apart at a glance.
   const contrast = useMemo(
@@ -213,10 +235,10 @@ export default function MatchSetupScreen({ onCancel, onStart }: Props) {
         <button className="btn ghost" onClick={onCancel}>
           ← Back
         </button>
-        <h1>New match</h1>
+        <h1>{title}</h1>
         <div className="spacer" />
         <button className="btn primary lg" onClick={start} disabled={!ready}>
-          Continue
+          {submitLabel}
         </button>
       </div>
 
@@ -232,6 +254,7 @@ export default function MatchSetupScreen({ onCancel, onStart }: Props) {
             key={side}
             label={side}
             team={side === 'home' ? home : visitor}
+            locked={locked?.[side] ?? new Set()}
             onChange={setters[side]}
           />
         ))}

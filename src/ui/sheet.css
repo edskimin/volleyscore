@@ -1,0 +1,188 @@
+/* OHSAA scoresheet, laid out in points against the real form.
+   Geometry taken from OHSAA Scoresheet.doc (revised 1/15/15): page 792x612pt
+   landscape, content inset to x 30.4..757.9. Column widths and band heights below are
+   the form's own, so a print at 100% lands on the printed grid. */
+
+.sheet-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sheet-chrome { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.sheet-chrome .spacer { flex: 1; }
+.set-tabs { display: inline-flex; gap: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px; }
+.set-tabs button { padding: 0.4rem 0.8rem; border-radius: 9px; font-size: 0.85rem; color: var(--fg-dim); }
+.set-tabs button[aria-pressed='true'] { background: var(--surface-3); color: var(--fg); font-weight: 600; }
+.set-tabs button:disabled { opacity: 0.3; }
+
+/* The sheet renders as a white document inside dark chrome, because looking like
+   paper is the point. */
+.sheet-scroll { flex: 1; min-height: 0; overflow: auto; display: grid; place-items: start center; padding: 0.5rem 0; }
+
+.sheet {
+  --u: 1pt;
+  --band: 43.52;
+  --line: #000;
+  width: calc(792 * var(--u));
+  height: calc(612 * var(--u));
+  flex: none;
+  background: #fff;
+  color: #111;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: calc(7 * var(--u));
+  line-height: 1.05;
+  position: relative;
+  transform-origin: top center;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.55);
+}
+
+.sheet .ink { position: absolute; left: calc(30.4 * var(--u)); width: calc(727.5 * var(--u)); }
+
+/* --- Title block --------------------------------------------------------- */
+
+.sheet-title { top: calc(28 * var(--u)); display: flex; align-items: flex-end; gap: calc(8 * var(--u)); font-size: calc(11 * var(--u)); font-weight: 700; }
+.sheet-title .rule { flex: 1; border-bottom: 1px solid var(--line); min-height: calc(13 * var(--u)); font-weight: 400; padding: 0 calc(3 * var(--u)); }
+.sheet-title .level em { font-style: normal; opacity: 0.28; }
+.sheet-title .level b { font-weight: 700; }
+
+.sheet-officials { top: calc(56 * var(--u)); display: flex; align-items: flex-end; gap: calc(8 * var(--u)); font-size: calc(9 * var(--u)); font-weight: 700; }
+.sheet-officials .rule { flex: 1; border-bottom: 1px solid var(--line); min-height: calc(12 * var(--u)); font-weight: 400; padding: 0 calc(3 * var(--u)); text-align: center; }
+.sheet-officials .cap { font-size: calc(6 * var(--u)); font-style: italic; font-weight: 700; display: block; }
+
+/* --- Main table ---------------------------------------------------------- */
+
+.sheet-table {
+  top: calc(119.6 * var(--u));
+  display: flex;
+  border: calc(1 * var(--u)) solid var(--line);
+  border-width: calc(1 * var(--u)) 0 0 calc(1 * var(--u));
+}
+.blk { display: flex; flex-direction: column; }
+.blk.team { flex: 0 0 calc(335.5 * var(--u)); }
+.blk.team.last { flex: 1 0 auto; }
+.blk.centre { flex: 0 0 calc(56.2 * var(--u)); }
+
+.row { display: flex; border-bottom: calc(1 * var(--u)) solid var(--line); }
+.row.h1 { height: calc(21.6 * var(--u)); }
+.row.h2 { height: calc(14.4 * var(--u)); }
+.row.band { height: calc(var(--band) * var(--u)); }
+
+.cel { border-right: calc(1 * var(--u)) solid var(--line); padding: 0 calc(2 * var(--u)); display: flex; align-items: center; overflow: hidden; }
+.cel.hdr { font-weight: 700; font-size: calc(8 * var(--u)); }
+.cel.grey { color: #b7b7b7; justify-content: center; font-weight: 700; }
+
+/* Every width below is the form's own, in points, as a fixed flex-basis rather than a
+   grow weight: with border-box sizing the border and padding sit inside the width, so
+   a header cell lands on exactly the same x as the band boxes beneath it. Grow weights
+   would let each cell's padding distort the proportions and the columns would drift.
+   Roman 18.5 + Player # 36 + ten boxes of 28.1 = 335.5. */
+.w-rn { flex: 0 0 calc(18.5 * var(--u)); }
+.w-pn { flex: 0 0 calc(36 * var(--u)); }
+.w-box { flex: 0 0 calc(28.1 * var(--u)); }
+.w-boxes { flex: 0 0 calc(281 * var(--u)); }
+.w-hdr { flex: 0 0 calc(54.5 * var(--u)); }    /* Roman + Player #, merged in headers */
+.w-team { flex: 0 0 calc(196.7 * var(--u)); }  /* TEAM, i.e. seven boxes */
+.w-b3 { flex: 0 0 calc(84.3 * var(--u)); }     /* three boxes: Libero #, Time Outs */
+.w-b5 { flex: 0 0 calc(140.5 * var(--u)); }    /* five boxes: tail of the Time Outs row */
+
+.cel.rn { justify-content: center; font-weight: 700; font-size: calc(9 * var(--u)); position: relative; }
+.cel.firstserve { flex-direction: column; justify-content: center; align-items: flex-start; line-height: 1.1; }
+.cel.tobox { justify-content: center; font-size: calc(6.6 * var(--u)); }
+
+/* Each serve order band is two rows of ten boxes, split by a dotted rule: twenty
+   boxes. The Player # column is split by the same rule, starter above, subs below. */
+.band-inner { display: flex; flex-direction: column; height: 100%; flex: 0 0 calc(281 * var(--u)); }
+.band-half { flex: 1; display: flex; min-height: 0; }
+.band-half.top { border-bottom: calc(0.6 * var(--u)) dotted #999; }
+.band-half .cel { border-bottom: 0; }
+
+.pn-stack { border-right: calc(1 * var(--u)) solid var(--line); display: flex; flex-direction: column; }
+.pn-stack > span { flex: 1; display: flex; align-items: center; padding: 0 calc(2 * var(--u)); font-size: calc(7.5 * var(--u)); overflow: hidden; }
+.pn-stack > span.top { border-bottom: calc(0.6 * var(--u)) dotted #999; }
+
+/* --- Marks --------------------------------------------------------------- */
+
+.mk { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: calc(8 * var(--u)); font-weight: 600; }
+.mk.circled { border: calc(0.9 * var(--u)) solid currentColor; border-radius: 50%; width: calc(13 * var(--u)); height: calc(13 * var(--u)); }
+/* Libero point and libero serve: an outlined triangle drawn around the mark. */
+.tri {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.tri polygon { fill: none; stroke: currentColor; stroke-width: 1.1; vector-effect: non-scaling-stroke; }
+
+/* The number sits low inside the triangle, where the triangle is wide enough to
+   enclose two digits without the strokes cutting through them. */
+.mk.triangled {
+  position: relative;
+  width: calc(21 * var(--u));
+  height: calc(17 * var(--u));
+  align-items: flex-end;
+  padding-bottom: calc(1.5 * var(--u));
+  font-size: calc(7 * var(--u));
+}
+.mk.triangled .tri { width: calc(21 * var(--u)); height: calc(17 * var(--u)); }
+.cel.rn .tri { width: calc(16 * var(--u)); height: calc(15 * var(--u)); }
+.cel.rn { padding-top: calc(2 * var(--u)); }
+.mk { white-space: nowrap; }
+.mk .sub { display: inline-flex; align-items: center; font-size: calc(5 * var(--u)); }
+.mk .sub sup, .mk .sub sub { font-size: calc(4.6 * var(--u)); line-height: 0; }
+.mk.small { font-size: calc(6 * var(--u)); font-weight: 700; letter-spacing: -0.02em; }
+
+/* --- Centre running score ------------------------------------------------ */
+
+.centre-body { flex: 1; display: flex; min-height: 0; }
+.score-col { flex: 1; border-right: calc(1 * var(--u)) solid var(--line); display: flex; flex-direction: column; padding: calc(1 * var(--u)) 0; }
+.score-pair { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; }
+.score-n { font-size: calc(6.2 * var(--u)); font-weight: 700; line-height: 1; padding: 0 calc(2.5 * var(--u)); position: relative; display: block; }
+.score-n.hi { text-align: right; }
+.score-n.slash { text-decoration: line-through; text-decoration-thickness: calc(0.9 * var(--u)); }
+.score-n.circle > span { display: inline-block; border: calc(0.8 * var(--u)) solid currentColor; border-radius: 999px; padding: 0 calc(1 * var(--u)); }
+.score-n.triangle > span::after { content: '\25B3'; font-size: calc(6 * var(--u)); margin-left: calc(0.5 * var(--u)); }
+
+/* --- Footer -------------------------------------------------------------- */
+
+.sheet-subs { top: calc(416.7 * var(--u)); display: flex; }
+.subs-cell { border: calc(1 * var(--u)) solid var(--line); border-top: 0; border-right: 0; height: calc(14.4 * var(--u)); display: flex; align-items: center; gap: calc(3 * var(--u)); padding: 0 calc(3 * var(--u)); font-size: calc(7.5 * var(--u)); font-weight: 700; }
+.subs-cell.left { flex: 0 0 calc(335.5 * var(--u)); }
+.subs-cell.mid { flex: 0 0 calc(56.2 * var(--u)); }
+.subs-cell.right { flex: 1 0 auto; border-right: calc(1 * var(--u)) solid var(--line); }
+.subs-cell i { font-style: normal; font-weight: 400; }
+.subs-cell i.used { text-decoration: line-through; font-weight: 700; }
+
+.sheet-comments { top: calc(431.1 * var(--u)); display: flex; }
+.comments-cell { border: calc(1 * var(--u)) solid var(--line); border-top: 0; border-right: 0; height: calc(36 * var(--u)); padding: calc(1 * var(--u)) calc(3 * var(--u)); font-size: calc(7 * var(--u)); overflow: hidden; }
+.comments-cell.left { flex: 0 0 calc(335.5 * var(--u)); }
+.comments-cell.mid { flex: 0 0 calc(56.2 * var(--u)); }
+.comments-cell.right { flex: 1 0 auto; border-right: calc(1 * var(--u)) solid var(--line); }
+.comments-cell b { font-size: calc(7.5 * var(--u)); }
+
+.sheet-summary { top: calc(467.1 * var(--u)); }
+.summary-bar { background: #000; color: #fff; text-align: center; font-weight: 700; font-size: calc(8 * var(--u)); height: calc(12 * var(--u)); line-height: calc(12 * var(--u)); letter-spacing: 0.06em; }
+.summary-body { border: calc(1 * var(--u)) solid var(--line); border-top: 0; padding: calc(4 * var(--u)) calc(5 * var(--u)); display: grid; gap: calc(6 * var(--u)); font-size: calc(8 * var(--u)); font-weight: 700; }
+.summary-line { display: flex; align-items: flex-end; gap: calc(6 * var(--u)); }
+.summary-line .rule { flex: 1; border-bottom: 1px solid var(--line); font-weight: 400; padding: 0 calc(3 * var(--u)); min-height: calc(11 * var(--u)); }
+.summary-line .rule.short { flex: 0 0 calc(70 * var(--u)); }
+
+.sheet-key { top: calc(545 * var(--u)); display: flex; justify-content: space-between; text-align: center; font-size: calc(6.4 * var(--u)); }
+.sheet-key div { display: grid; gap: calc(1 * var(--u)); }
+.sheet-key b { font-size: calc(11 * var(--u)); }
+
+/* --- Screen scaling and print -------------------------------------------- */
+
+.sheet-scale { transform: scale(var(--scale, 1)); transform-origin: top center; }
+
+@media print {
+  @page { size: letter landscape; margin: 0; }
+  body { background: #fff; }
+  .app > .screen > *:not(.sheet-scroll) { display: none !important; }
+  .sheet-scroll { overflow: visible; padding: 0; }
+  .sheet-scale { transform: none !important; }
+  .sheet { box-shadow: none; }
+}

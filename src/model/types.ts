@@ -200,8 +200,14 @@ export interface Slot {
   position: CourtPosition
   /** Jersey number on court now. May be a libero. */
   current: string
-  /** Prior occupants, oldest first. Liberos are never recorded here. */
+  /** Prior occupants, oldest first. */
   history: string[]
+  /**
+   * The non-libero players who have held this slot, oldest first. This is what the
+   * Player Number column prints: the libero number is NEVER recorded there, it goes
+   * only in the Libero # field.
+   */
+  sheetPlayers: string[]
   /** Triangle on the Roman numeral: the slot this libero is locked to serve from. */
   liberoServeFlag: boolean
 }
