@@ -1,0 +1,311 @@
+import { useMemo, useState } from 'react'
+
+import type { MatchSetup, RosterPlayer, TeamSide, TeamSnapshot } from '../model/types'
+import { contrastRatio, readableOn } from './color'
+
+interface Props {
+  onCancel: () => void
+  onStart: (setup: MatchSetup) => void
+}
+
+function blankTeam(name: string, color: string): TeamSnapshot {
+  return {
+    teamId: null,
+    name,
+    colorPrimary: color,
+    colorText: readableOn(color),
+    roster: [],
+    liberoNumbers: [],
+  }
+}
+
+function sortRoster(roster: RosterPlayer[]): RosterPlayer[] {
+  // Jersey numbers are identifiers, not quantities. Sort numerically for display only.
+  return [...roster].sort((a, b) => Number(a.number) - Number(b.number))
+}
+
+function TeamEditor({
+  team,
+  label,
+  onChange,
+}: {
+  team: TeamSnapshot
+  label: string
+  onChange: (next: TeamSnapshot) => void
+}) {
+  const [number, setNumber] = useState('')
+  const [name, setName] = useState('')
+
+  function add() {
+    const n = number.trim()
+    if (!n || team.roster.some((p) => p.number === n)) return
+    onChange({
+      ...team,
+      roster: sortRoster([...team.roster, { number: n, name: name.trim() || null, captain: false }]),
+    })
+    setNumber('')
+    setName('')
+  }
+
+  function update(target: string, patch: Partial<RosterPlayer>) {
+    onChange({
+      ...team,
+      roster: team.roster.map((p) => (p.number === target ? { ...p, ...patch } : p)),
+    })
+  }
+
+  function remove(target: string) {
+    onChange({
+      ...team,
+      roster: team.roster.filter((p) => p.number !== target),
+      liberoNumbers: team.liberoNumbers.filter((n) => n !== target),
+    })
+  }
+
+  function toggleLibero(target: string) {
+    const has = team.liberoNumbers.includes(target)
+    if (!has && team.liberoNumbers.length >= 2) return
+    onChange({
+      ...team,
+      liberoNumbers: has
+        ? team.liberoNumbers.filter((n) => n !== target)
+        : [...team.liberoNumbers, target],
+    })
+  }
+
+  return (
+    <section className="card team-editor">
+      <header style={{ borderColor: team.colorPrimary }}>
+        <span className="eyebrow">{label}</span>
+        <input
+          className="team-name"
+          value={team.name}
+          placeholder="Team name"
+          onChange={(e) => onChange({ ...team, name: e.target.value })}
+        />
+        <label className="color-well" style={{ background: team.colorPrimary }}>
+          <input
+            type="color"
+            value={team.colorPrimary}
+            onChange={(e) =>
+              onChange({
+                ...team,
+                colorPrimary: e.target.value,
+                colorText: readableOn(e.target.value),
+              })
+            }
+          />
+        </label>
+      </header>
+
+      <div className="add-player">
+        <input
+          className="num"
+          inputMode="numeric"
+          placeholder="#"
+          value={number}
+          maxLength={3}
+          onChange={(e) => setNumber(e.target.value.replace(/\D/g, ''))}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+        />
+        <input
+          placeholder="Name (optional)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+        />
+        <button className="btn" onClick={add} disabled={!number.trim()}>
+          Add
+        </button>
+      </div>
+
+      {team.roster.length === 0 ? (
+        <p className="faint roster-hint">
+          Numbers are required, names are not. The sheet only needs numbers.
+        </p>
+      ) : (
+        <ul className="roster">
+          {team.roster.map((p) => {
+            const libero = team.liberoNumbers.includes(p.number)
+            return (
+              <li key={p.number} className={libero ? 'libero' : undefined}>
+                <b className="num">{p.number}</b>
+                <span className="pname muted">{p.name ?? '—'}</span>
+                <button
+                  className={p.captain ? 'tag on' : 'tag'}
+                  title="Floor captain"
+                  onClick={() => update(p.number, { captain: !p.captain })}
+                >
+                  C
+                </button>
+                <button
+                  className={libero ? 'tag on' : 'tag'}
+                  title="Libero"
+                  disabled={!libero && team.liberoNumbers.length >= 2}
+                  onClick={() => toggleLibero(p.number)}
+                >
+                  L
+                </button>
+                <button className="tag remove" onClick={() => remove(p.number)} title="Remove">
+                  ×
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <footer className="muted">
+        {team.roster.length} players · {team.liberoNumbers.length} libero
+        {team.liberoNumbers.length === 1 ? '' : 's'}
+      </footer>
+    </section>
+  )
+}
+
+export default function MatchSetupScreen({ onCancel, onStart }: Props) {
+  const [home, setHome] = useState(() => blankTeam('', '#14284B'))
+  const [visitor, setVisitor] = useState(() => blankTeam('', '#7A1120'))
+  const [level, setLevel] = useState<MatchSetup['level']>('varsity')
+  const [format, setFormat] = useState<MatchSetup['format']>('best_of_5')
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [venue, setVenue] = useState('')
+  const [scorerName, setScorerName] = useState('')
+  const [r1Name, setR1Name] = useState('')
+  const [r1Number, setR1Number] = useState('')
+  const [r2Name, setR2Name] = useState('')
+  const [r2Number, setR2Number] = useState('')
+
+  // The whole in-match design depends on telling the two panels apart at a glance.
+  const contrast = useMemo(
+    () => contrastRatio(home.colorPrimary, visitor.colorPrimary),
+    [home.colorPrimary, visitor.colorPrimary],
+  )
+
+  const ready =
+    home.name.trim() !== '' &&
+    visitor.name.trim() !== '' &&
+    home.roster.length >= 6 &&
+    visitor.roster.length >= 6
+
+  function start() {
+    onStart({
+      level,
+      format,
+      date,
+      venue: venue.trim() || null,
+      officials: {
+        r1Name: r1Name.trim() || null,
+        r1Number: r1Number.trim() || null,
+        r2Name: r2Name.trim() || null,
+        r2Number: r2Number.trim() || null,
+      },
+      scorerName: scorerName.trim() || null,
+      home: { ...home, name: home.name.trim() },
+      visitor: { ...visitor, name: visitor.name.trim() },
+    })
+  }
+
+  const setters: Record<TeamSide, (t: TeamSnapshot) => void> = { home: setHome, visitor: setVisitor }
+
+  return (
+    <div className="screen screen-scroll setup">
+      <div className="topbar">
+        <button className="btn ghost" onClick={onCancel}>
+          ← Back
+        </button>
+        <h1>New match</h1>
+        <div className="spacer" />
+        <button className="btn primary lg" onClick={start} disabled={!ready}>
+          Continue
+        </button>
+      </div>
+
+      {!ready && (
+        <p className="faint requirement">
+          Both teams need a name and at least six players. Everything else is optional.
+        </p>
+      )}
+
+      <div className="team-grid">
+        {(['home', 'visitor'] as TeamSide[]).map((side) => (
+          <TeamEditor
+            key={side}
+            label={side}
+            team={side === 'home' ? home : visitor}
+            onChange={setters[side]}
+          />
+        ))}
+      </div>
+
+      {contrast < 1.6 && home.name && visitor.name && (
+        <p className="contrast-warn">
+          Those team colors are hard to tell apart ({contrast.toFixed(2)}:1). The in-match
+          screen leans on the difference.
+        </p>
+      )}
+
+      <section className="card meta-grid">
+        <div className="field">
+          <label>Level</label>
+          <div className="seg">
+            {(['freshman', 'jv', 'varsity'] as const).map((l) => (
+              <button key={l} aria-pressed={level === l} onClick={() => setLevel(l)}>
+                {l === 'jv' ? 'JV' : l[0].toUpperCase() + l.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <label>Format</label>
+          <div className="seg">
+            {(['best_of_3', 'best_of_5'] as const).map((f) => (
+              <button key={f} aria-pressed={format === f} onClick={() => setFormat(f)}>
+                {f === 'best_of_3' ? 'Best of 3' : 'Best of 5'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <label>Date</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Venue</label>
+          <input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Optional" />
+        </div>
+        <div className="field">
+          <label>Scorer</label>
+          <input
+            value={scorerName}
+            onChange={(e) => setScorerName(e.target.value)}
+            placeholder="Optional"
+          />
+        </div>
+        <div className="field">
+          <label>R1</label>
+          <div className="pair">
+            <input value={r1Name} onChange={(e) => setR1Name(e.target.value)} placeholder="Name" />
+            <input
+              className="num"
+              value={r1Number}
+              onChange={(e) => setR1Number(e.target.value)}
+              placeholder="OHSAA #"
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label>R2</label>
+          <div className="pair">
+            <input value={r2Name} onChange={(e) => setR2Name(e.target.value)} placeholder="Name" />
+            <input
+              className="num"
+              value={r2Number}
+              onChange={(e) => setR2Number(e.target.value)}
+              placeholder="OHSAA #"
+            />
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}

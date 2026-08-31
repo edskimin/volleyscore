@@ -305,10 +305,14 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
           }
           team.liberoOnCourt = ev.liberoNumber
           team.liberoOwes[ev.liberoNumber] = ev.playerNumber
+          // The replaced player has now played, so the re-entry rule applies to her
+          // exactly as it would after a substitution: she comes back in this slot.
+          team.exitSlot[ev.playerNumber] = ev.slot
         } else {
           if (slot) slot.current = ev.playerNumber
           if (team.liberoOnCourt === ev.liberoNumber) team.liberoOnCourt = null
           delete team.liberoOwes[ev.liberoNumber]
+          delete team.exitSlot[ev.playerNumber]
         }
         // Never a substitution. Consumes no box on the sheet.
         break

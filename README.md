@@ -19,7 +19,10 @@ Do not introduce mutable current-state storage as an optimization.
 |---|---|
 | `src/model/types.ts` | Event schema and derived state shapes |
 | `src/model/reducer.ts` | The fold, rotation, and sheet-mark rules |
+| `src/model/selection.ts` | What a substitution gesture means, and what is eligible |
+| `src/state/store.ts` | Ownership of the log; the only place it is written |
 | `src/db/db.ts` | Dexie stores, export, import, migration |
+| `src/ui/` | Screens |
 | `docs/` | The specification, and the authority for behavior |
 
 ## Documents
@@ -60,5 +63,18 @@ real protection against losing a match, not the per-set backup store.
 
 ## Status
 
-The reducer and storage layer are built and tested. The screens in
-`03-screens-and-flows.md` are not — `src/App.tsx` is a scaffold that exercises the fold.
+Built: the reducer, the selection model, storage, and four of the seven screens —
+home, match setup, set setup, and the in-match screen.
+
+Not built yet:
+
+- The scoresheet render (`02-scoresheet-notation.md`). The reducer already produces
+  the marks; nothing draws them. The in-match screen has no "Sheet" button until it
+  does.
+- Adjustment mode, so the overflow menu has no "Fix lineup" entry yet.
+- Match closeout, including the blocking export. Export is reachable from the overflow
+  menu in the meantime.
+
+One deliberate deviation from the spec: `SET_ENDED` is not emitted automatically when
+the win condition is met. A banner offers it instead, so a mis-tap on set point stays a
+one-tap recovery rather than needing two undos.

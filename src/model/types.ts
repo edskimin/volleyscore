@@ -167,6 +167,9 @@ export type MatchEvent =
   | SetEnded
   | MatchEnded
 
+/** An event before the log stamps `seq` and `ts` on it. Distributes over the union. */
+export type EventBody<T = MatchEvent> = T extends unknown ? Omit<T, 'seq' | 'ts'> : never
+
 // --- Sheet marks -----------------------------------------------------------
 
 /** A mark in the running score column. Circle and triangle are mutually exclusive. */
