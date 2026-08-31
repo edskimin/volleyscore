@@ -1,0 +1,72 @@
+:root {
+  --bg: #0b0f14;
+  --fg: #e8edf3;
+  --dim: #8a97a6;
+  color-scheme: dark;
+  font-family: ui-sans-serif, -apple-system, system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+.scaffold { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
+.scaffold h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.02em; }
+.scaffold header p { margin: 0.25rem 0 1.25rem; color: var(--dim); font-size: 0.85rem; }
+.scaffold code { color: var(--fg); }
+
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+.panel {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem;
+  border: 0;
+  border-radius: 14px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  filter: brightness(0.55);
+  transition: filter 120ms ease;
+}
+.panel.serving { filter: none; }
+
+.team { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; }
+.score { font-size: 4rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.serve { font-size: 0.85rem; opacity: 0.9; }
+.meta { font-size: 0.7rem; background: #fff; padding: 0.1rem 0.35rem; border-radius: 4px; justify-self: start; }
+
+.court { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.3rem; margin-top: 0.5rem; }
+.cell {
+  display: grid;
+  padding: 0.35rem;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.12);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.cell em, .cell i { font-style: normal; font-size: 0.6rem; opacity: 0.7; font-weight: 400; }
+
+.rows { display: grid; gap: 0.15rem; margin-top: 0.5rem; background: #fff; padding: 0.4rem; border-radius: 8px; }
+.row { display: flex; gap: 0.3rem; align-items: baseline; font-size: 0.75rem; }
+.row em { font-style: normal; width: 2rem; color: #666; font-size: 0.65rem; }
+.row b { font-variant-numeric: tabular-nums; }
+
+footer { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; color: var(--dim); font-size: 0.85rem; }
+footer button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  background: transparent;
+  color: var(--fg);
+}
+footer button:disabled { opacity: 0.35; }
+
+.warnings { margin-top: 1rem; color: #ffb4b4; font-size: 0.85rem; }
