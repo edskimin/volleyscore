@@ -22,6 +22,7 @@ Do not introduce mutable current-state storage as an optimization.
 | `src/model/selection.ts` | What a substitution gesture means, and what is eligible |
 | `src/state/store.ts` | Ownership of the log; the only place it is written |
 | `src/db/db.ts` | Dexie stores, export, import, migration |
+| `src/db/db.test.ts` | Storage tests, including the version 1 to 2 upgrade path |
 | `src/ui/` | Screens |
 | `docs/` | The specification, and the authority for behavior |
 
@@ -42,6 +43,11 @@ npm run dev
 ```bash
 npm test
 ```
+
+49 tests. The reducer and selection model are pure and tested directly; the storage
+layer runs against `fake-indexeddb`, including the version 1 to version 2 upgrade,
+which is a real regression test — reintroducing the primary key change fails it with
+Dexie's `UpgradeError`.
 
 ## Deploy
 
@@ -68,7 +74,8 @@ never wait on a network round trip. Everything lives in IndexedDB.
 
 IndexedDB on iOS is not durable storage — Safari can evict script-writable storage
 after roughly seven days without site interaction. The blocking closeout export is the
-real protection against losing a match, not the per-set backup store.
+real protection against losing a match. Installing to the home screen helps and the
+per-set backup store helps, but neither is a guarantee and the app says so.
 
 **Dexie cannot change a store's primary key in an upgrade.** It throws `UpgradeError`,
 the database never opens, and every screen goes blank on any device that already ran
@@ -93,13 +100,17 @@ been written out to a file. `exportedAt` on the match record is what gates it, s
 block survives a reload rather than living in component state. The home screen flags
 any match that has never been exported.
 
+All three durability mitigations from `01-data-model.md` are in place: the blocking
+closeout export, the install-to-home-screen prompt, and the per-set backup store.
+
 Not built yet:
 
-- The prompt to install to the home screen (durability mitigation 2 in
-  `01-data-model.md`). Mitigations 1 and 3, the blocking export and the per-set
-  backup store, are both in place.
-- Automated tests for `src/db` and `src/state`. The reducer and selection model are
-  covered; the storage layer is not, which is how a fatal Dexie migration got through.
+- Tests for `src/state`. The reducer, the selection model and the storage layer are
+  covered; the store hook is not, because it would need jsdom and a React testing
+  library for what is fairly thin glue. Worth adding if it grows.
+- Everything in the Deferred list of `03-screens-and-flows.md`: cards and penalty
+  points, the Libero Tracking Sheet, libero injury redesignation, per-player entry
+  counts, and season aggregate views.
 
 One deliberate deviation from the spec: `SET_ENDED` is not emitted automatically when
 the win condition is met. A banner offers it instead, so a mis-tap on set point stays a

@@ -34,6 +34,8 @@ export interface TeamRecord extends TeamSnapshot {
 export interface AppStateRecord {
   key: 'singleton'
   activeMatchId: string | null
+  /** Whether the operator has waved away the install-to-home-screen prompt. */
+  installDismissed?: boolean
 }
 
 export interface BackupRecord {
@@ -74,13 +76,30 @@ export { db }
 
 // --- Active match ----------------------------------------------------------
 
+/** Merge rather than replace: appState is one row holding several unrelated flags. */
+async function patchAppState(patch: Partial<AppStateRecord>): Promise<void> {
+  const current = (await db.appState.get('singleton')) ?? {
+    key: 'singleton' as const,
+    activeMatchId: null,
+  }
+  await db.appState.put({ ...current, ...patch })
+}
+
 export async function getActiveMatchId(): Promise<string | null> {
   const row = await db.appState.get('singleton')
   return row?.activeMatchId ?? null
 }
 
 export async function setActiveMatchId(activeMatchId: string | null): Promise<void> {
-  await db.appState.put({ key: 'singleton', activeMatchId })
+  await patchAppState({ activeMatchId })
+}
+
+export async function isInstallDismissed(): Promise<boolean> {
+  return (await db.appState.get('singleton'))?.installDismissed === true
+}
+
+export async function dismissInstall(): Promise<void> {
+  await patchAppState({ installDismissed: true })
 }
 
 // --- Matches ---------------------------------------------------------------

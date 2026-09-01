@@ -592,3 +592,12 @@ button {
 
 .check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; color: var(--fg-dim); }
 .check input { accent-color: var(--fg); }
+
+/* --- Install prompt ------------------------------------------------------ */
+
+.install-prompt { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.install-copy { flex: 1; min-width: 260px; }
+.install-copy h2 { margin: 0 0 0.2rem; font-size: 0.95rem; font-weight: 600; }
+.install-copy p { margin: 0; font-size: 0.85rem; max-width: 62ch; }
+.install-copy b { color: var(--fg); font-weight: 650; }
+.install-actions { display: flex; gap: 0.4rem; }

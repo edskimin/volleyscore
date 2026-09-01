@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { importMatch, listMatches, type MatchRecord } from '../db/db'
+import {
+  dismissInstall,
+  importMatch,
+  isInstallDismissed,
+  listMatches,
+  type MatchRecord,
+} from '../db/db'
 import { fold } from '../model/reducer'
+import InstallPrompt from './InstallPrompt'
 
 interface Props {
   activeMatchId: string | null
@@ -18,10 +25,14 @@ function summarize(record: MatchRecord): string {
 export default function Home({ activeMatchId, onNew, onOpen }: Props) {
   const [matches, setMatches] = useState<MatchRecord[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [showInstall, setShowInstall] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = () => void listMatches().then(setMatches)
   useEffect(refresh, [])
+  useEffect(() => {
+    void isInstallDismissed().then((d) => setShowInstall(!d))
+  }, [])
 
   async function onFile(file: File) {
     setError(null)
@@ -65,6 +76,16 @@ export default function Home({ activeMatchId, onNew, onOpen }: Props) {
       />
 
       {error && <p className="import-error">{error}</p>}
+
+      {showInstall && (
+        <InstallPrompt
+          onDismiss={() => {
+            // Hide only once the dismissal is stored, so the screen never disagrees
+            // with what a reload will show.
+            void dismissInstall().then(() => setShowInstall(false))
+          }}
+        />
+      )}
 
       {matches.length === 0 ? (
         <div className="empty card">

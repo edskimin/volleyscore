@@ -477,3 +477,14 @@ Mitigations, in order of importance:
    has been shared. This is the real protection.
 2. Prompt to install to the home screen.
 3. Write a backup copy to a second object store after each set.
+
+All three are implemented. Two notes from doing so:
+
+- **Never change a store's primary key in a Dexie upgrade.** Dexie throws
+  `UpgradeError`, the database never opens, and every screen goes blank on any device
+  that already ran the previous version. Adding an index is safe. If a key genuinely
+  has to change, create a new store and drop the old one.
+- **The export must not escalate a failed share.** `navigator.share` throws
+  `NotAllowedError` when a permissions policy refuses it; that has to fall through to
+  the blob download, or the match is stranded on the device. Only a deliberate cancel
+  should stop an export, and it must not count as one.
