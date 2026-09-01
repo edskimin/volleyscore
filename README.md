@@ -21,6 +21,8 @@ Do not introduce mutable current-state storage as an optimization.
 | `src/model/reducer.ts` | The fold, rotation, and sheet-mark rules |
 | `src/model/selection.ts` | What a substitution gesture means, and what is eligible |
 | `src/model/lineup.ts` | Why a lineup is not ready to start, in words |
+| `src/ui/palette.ts` | `derivePalette()`, ported from the reference implementation |
+| `src/ui/in-match.css` | The in-match screen's styles, ported from the reference |
 | `src/state/store.ts` | Ownership of the log; the only place it is written |
 | `src/db/db.ts` | Dexie stores, export, import, migration |
 | `src/db/db.test.ts` | Storage tests, including the version 1 to 2 upgrade path |
@@ -33,6 +35,26 @@ Do not introduce mutable current-state storage as an optimization.
 - [`01-data-model.md`](docs/01-data-model.md) — event schema, reducer rules, storage
 - [`02-scoresheet-notation.md`](docs/02-scoresheet-notation.md) — how the sheet is marked
 - [`03-screens-and-flows.md`](docs/03-screens-and-flows.md) — screens and interaction
+- [`04-design-tokens.md`](docs/04-design-tokens.md) — the visual language
+- [`05-instructions.md`](docs/05-instructions.md) — build order and non-negotiables
+- [`refeerence/in-match.html`](docs/refeerence/in-match.html) — the approved in-match
+  screen, working. **The source of truth for that screen.** Open it in a browser.
+
+## The in-match screen is a port
+
+`src/ui/InMatch.tsx`, `src/ui/in-match.css` and `src/ui/palette.ts` are ported from the
+reference implementation, not reinterpreted. Every color, size, radius and spacing value
+is the reference's own, verified by measuring both in a browser: the stage geometry, the
+whole type scale, and `derivePalette()` output all match exactly. `src/ui/palette.test.ts`
+pins the palette against values captured by running the reference itself, so a drift
+fails the suite.
+
+The layout is deliberately **not** fluid. The app is locked to a 1180 by 820 stage and
+every dimension is a share of the stage height in `cqh`. The proportions between the
+score, the court and the roster row are the design.
+
+The other screens still use `index.css` and its older tokens. The reference's styles are
+scoped under `.app` and ours under `.app-root` so the two cannot reach each other.
 
 ## Develop
 

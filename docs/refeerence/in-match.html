@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Volleyball Scorer: in-match reference</title>
+
+<!--
+  REFERENCE IMPLEMENTATION: IN-MATCH SCREEN
+  =========================================
+  This is the approved visual design. Port it to React exactly.
+  Do not redesign. Do not substitute colors, spacing, or radii.
+
+  LAYOUT MODEL (important)
+  ------------------------
+  The app is locked to the iPad landscape aspect, 1180 by 820 (1.44:1). .stage
+  sizes itself to fit the viewport and centres; .app inside it is a size container.
+  Every dimension below is expressed in cqh, one percent of the stage height,
+  so the design holds its exact proportions at any window size instead of
+  spreading into whatever space it is given.
+
+  Do NOT replace this with a fluid layout. The proportions between the score,
+  the court, and the roster row ARE the design. On a real iPad the stage is
+  the full screen and this is a no-op.
+
+  Small text carries a px floor via max(), so nothing drops below 11px.
+
+  Team colors are CONTENT, not chrome. They stay fully saturated in both
+  themes. All shades are derived at runtime from one primary hex per team,
+  so a user-picked color works without hand-tuning. See derivePalette().
+-->
+
+<style>
+/* ---------------------------------------------------------------
+   1. CHROME TOKENS
+   Team colors are derived in JS, not declared here.
+   --------------------------------------------------------------- */
+:root {
+  --font-sans: ui-sans-serif, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --flag-amber: #E0952A;   /* rule-broken markers only, identical in both themes */
+}
+
+[data-theme="dark"] {
+  --app-bg:         #0B0B0F;
+  --rail-bg:        #101014;
+  --border:         #1E1E26;
+  --border-strong:  #30303A;
+  --text-primary:   #F2F2F5;
+  --text-secondary: #9A9AA4;
+  --text-muted:     #6E6E78;
+  --control-text:   #B8B8C2;
+  --control-hover:  #1A1A21;
+  --cell-active-bg: #FFFFFF;
+}
+
+[data-theme="light"] {
+  --app-bg:         #EFEFF2;
+  --rail-bg:        #FFFFFF;
+  --border:         #E0E0E5;
+  --border-strong:  #C9C9D1;
+  --text-primary:   #16161A;
+  --text-secondary: #55555F;
+  --text-muted:     #85858F;
+  --control-text:   #34343C;
+  --control-hover:  #E8E8ED;
+  --cell-active-bg: #FFFFFF;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--app-bg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  display: flex;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* ---------------------------------------------------------------
+   2. STAGE
+   Locks the app to iPad landscape proportions and centres it.
+   --------------------------------------------------------------- */
+.stage {
+  width:  min(100vw, calc(100dvh * 1180 / 820));
+  height: min(100dvh, calc(100vw * 820 / 1180));
+  margin: auto;
+}
+
+.app {
+  height: 100%;
+  container-type: size;
+  display: flex;
+  flex-direction: column;
+  background: var(--app-bg);
+
+  /* Every size below is a share of the stage height. */
+  --s1: 0.5cqh;
+  --s2: 1cqh;
+  --s3: 1.5cqh;
+  --s4: 2cqh;
+
+  --type-score:      18cqh;
+  --type-team:       max(15px, 2.9cqh);
+  --type-cell:       max(24px, 6cqh);
+  --type-cell-label: max(13px, 2.3cqh);
+  --type-cell-hist:  max(12px, 1.95cqh);
+  --type-chip:       max(14px, 2.6cqh);
+  --type-body:       max(12px, 1.9cqh);
+  --type-label:      max(11px, 1.7cqh);
+  --type-micro:      max(12px, 2cqh);
+
+  --radius-panel:   2cqh;
+  --radius-cell:    1.2cqh;
+  --radius-chip:    0.85cqh;
+  --radius-control: 1.1cqh;
+}
+
+/* ---------------------------------------------------------------
+   3. CONTEXT RAIL
+   --------------------------------------------------------------- */
+.rail {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s2) var(--s4);
+  background: var(--rail-bg);
+  border-bottom: 1px solid var(--border);
+}
+.rail-left, .rail-right { display: flex; align-items: center; gap: var(--s3); }
+.rail-level {
+  font-size: var(--type-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.rail-sets  { font-size: var(--type-label); color: var(--text-secondary); }
+.rail-clock { font-size: var(--type-label); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.rail-icon  { color: var(--text-muted); display: flex; }
+.rail-icon svg { width: 2.1cqh; height: 2.1cqh; }
+
+/* ---------------------------------------------------------------
+   4. COURT AREA
+   --------------------------------------------------------------- */
+.court-area {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  gap: var(--s2);
+  padding: var(--s2);
+  min-height: 0;
+}
+
+.panel {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-panel);
+  padding: var(--s3) var(--s3) var(--s2);
+  transition: background-color 140ms ease;
+}
+
+/* Team name stays outboard-left on BOTH sides. Only the body mirrors. */
+.panel-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.panel-name { font-size: var(--type-team); font-weight: 600; }
+.panel-sets { font-size: var(--type-label); }
+
+/* Score outboard, court inboard, so the two front rows face each other. */
+.panel-body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-height: 0;
+}
+.panel[data-side="visitor"] .panel-body  { flex-direction: row-reverse; }
+.panel[data-side="visitor"] .score-block { align-items: flex-end; }
+.panel[data-side="visitor"] .serve-line  { flex-direction: row-reverse; }
+
+/* --- the score IS the button --- */
+.score-block {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--s2);
+  border-radius: var(--radius-cell);
+  cursor: pointer;
+}
+.score-block:active { background: rgba(127,127,127,0.14); }
+.score-value {
+  font-size: var(--type-score);
+  line-height: 0.84;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.serve-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-top: var(--s2);
+  font-size: var(--type-body);
+}
+.serve-line svg { width: 2.5cqh; height: 2.5cqh; }
+
+/* --- court grid --- */
+.court {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, 19cqh);
+  gap: 0.9cqh;
+}
+.cell {
+  height: 18.4cqh;
+  border-radius: var(--radius-cell);
+  padding: 1cqh 1.4cqh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background-color 120ms ease, opacity 120ms ease;
+}
+.cell-top    { display: flex; align-items: center; gap: 0.5cqh; font-size: var(--type-cell-label); }
+.cell-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6cqh; }
+.cell-number { font-size: var(--type-cell); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
+.cell-history{ font-size: var(--type-cell-hist); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* --- roster row: fixed slots, nine across --- */
+.roster {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 0.7cqh;
+  margin-top: var(--s3);
+}
+.panel[data-side="visitor"] .roster { direction: rtl; }
+.chip {
+  direction: ltr;
+  height: 5cqh;
+  border-radius: var(--radius-chip);
+  border: 1.5px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3cqh;
+  font-size: var(--type-chip);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: opacity 120ms ease, background-color 120ms ease;
+}
+.chip-slot { font-size: max(11px, 1.85cqh); align-self: flex-end; margin-bottom: 0.6cqh; }
+.chip[data-state="oncourt"]    { background: transparent; cursor: default; }
+.chip[data-state="ineligible"] { opacity: 0.28; cursor: default; }
+
+/* --- substitution budget --- */
+.subs {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--s2);
+  padding-top: var(--s1);
+  border-top: 1px solid;
+}
+.sub-n { font-size: var(--type-micro); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------
+   5. CENTRE DIVIDER
+   --------------------------------------------------------------- */
+.divider {
+  flex: 0 0 7cqh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+}
+.divider-label {
+  font-size: var(--type-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.divider-set   { font-size: 5cqh; line-height: 1; color: var(--text-primary); font-weight: 600; }
+.divider-rule  { width: 1px; height: 7cqh; background: var(--border); }
+.divider-match { font-size: var(--type-label); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------
+   6. ACTION BAR
+   Spatially mirrored: home left, visitor right, shared centre.
+   --------------------------------------------------------------- */
+.bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s2) var(--s3);
+  background: var(--rail-bg);
+  border-top: 1px solid var(--border);
+}
+.bar-group { display: flex; gap: var(--s1); flex: 1 1 0; }
+.bar-group.right  { justify-content: flex-end; }
+.bar-group.centre { flex: 0 0 auto; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8cqh;
+  padding: 1.2cqh 2cqh;
+  border-radius: var(--radius-control);
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--control-text);
+  font-family: inherit;
+  font-size: var(--type-body);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn svg { width: 2.1cqh; height: 2.1cqh; }
+.btn:active { background: var(--control-hover); }
+.btn:disabled { opacity: 0.35; cursor: default; }
+.btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+.hint {
+  flex: 0 0 auto;
+  padding: var(--s2) var(--s4);
+  border-top: 1px solid var(--border);
+  background: var(--rail-bg);
+  color: var(--text-secondary);
+  font-size: var(--type-label);
+  line-height: 1.6;
+}
+.hint[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+
+<body>
+<div class="stage">
+<div class="app">
+
+  <header class="rail">
+    <div class="rail-left">
+      <span class="rail-level">Varsity</span>
+      <span class="rail-sets">25&ndash;21 &middot; 22&ndash;25 &middot; in progress</span>
+    </div>
+    <div class="rail-right">
+      <span class="rail-clock">18:42</span>
+      <span class="rail-icon" title="Saved on this device" aria-label="Saved on this device">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h9l5 5v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 4v5h6"/><circle cx="12" cy="15" r="2"/></svg>
+      </span>
+      <span class="rail-icon" title="Offline" aria-label="Offline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M9.5 17.5a3.5 3.5 0 0 1 5 0"/><path d="M6 14a8 8 0 0 1 3-2"/><path d="M18 14a8 8 0 0 0-6.5-2.3"/></svg>
+      </span>
+      <button class="btn" id="theme-btn" style="padding:0.9cqh 1.6cqh">Light</button>
+    </div>
+  </header>
+
+  <main class="court-area">
+    <section class="panel" id="panel-home" data-side="home" aria-label="Home team"></section>
+    <div class="divider">
+      <span class="divider-label">Set</span>
+      <span class="divider-set" id="set-number">3</span>
+      <span class="divider-rule"></span>
+      <span class="divider-match" id="match-score">1&ndash;1</span>
+    </div>
+    <section class="panel" id="panel-visitor" data-side="visitor" aria-label="Visiting team"></section>
+  </main>
+
+  <footer class="bar">
+    <div class="bar-group">
+      <button class="btn" id="to-home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4"/><path d="M9 2h6"/></svg>
+        time out
+      </button>
+      <button class="btn" id="rp-home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h13l-2.5 4L18 13H5"/></svg>
+        replay
+      </button>
+    </div>
+    <div class="bar-group centre">
+      <button class="btn" id="undo-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 13L4 9l5-4"/><path d="M4 9h9a6 6 0 0 1 0 12h-3"/></svg>
+        undo
+      </button>
+      <button class="btn" id="sheet-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>
+        sheet
+      </button>
+      <button class="btn" id="more-btn" aria-label="More">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18" cy="12" r="1.7"/></svg>
+      </button>
+    </div>
+    <div class="bar-group right">
+      <button class="btn" id="rp-vis">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h13l-2.5 4L18 13H5"/></svg>
+        replay
+      </button>
+      <button class="btn" id="to-vis">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4"/><path d="M9 2h6"/></svg>
+        time out
+      </button>
+    </div>
+  </footer>
+
+  <div class="hint" id="hint" hidden></div>
+</div>
+</div>
+
+<script>
+"use strict";
+/* =================================================================
+   COLOR DERIVATION
+   One primary hex per team produces every shade the panel needs, so a
+   user-picked color works with no hand-tuning.
+   ================================================================= */
+function hexToHsl(hex) {
+  var r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+  var mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx-mn, h = 0, s = 0, l = (mx+mn)/2;
+  if (d) {
+    s = l > 0.5 ? d/(2-mx-mn) : d/(mx+mn);
+    if (mx === r) h = ((g-b)/d + (g<b?6:0));
+    else if (mx === g) h = (b-r)/d + 2;
+    else h = (r-g)/d + 4;
+    h *= 60;
+  }
+  return { h: h, s: s*100, l: l*100 };
+}
+function hsl(h,s,l) {
+  return "hsl(" + h.toFixed(1) + " " + Math.max(0,Math.min(100,s)).toFixed(1) + "% " + Math.max(0,Math.min(100,l)).toFixed(1) + "%)";
+}
+function relLum(hex) {
+  var c = [1,3,5].map(function(i){
+    var v = parseInt(hex.slice(i,i+2),16)/255;
+    return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4);
+  });
+  return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
+}
+function derivePalette(hex, theme) {
+  var c = hexToHsl(hex);
+  var pale = relLum(hex) > 0.42;                 /* e.g. a gold or yellow team */
+  return {
+    base:      hex,
+    /* Receiving state. Dark theme recedes by darkening. Light theme recedes
+       by desaturating and lifting, because on a pale background darkening
+       reads as heavier rather than quieter. */
+    dim:       theme === "light"
+                 ? hsl(c.h, c.s * 0.4, Math.min(c.l + 16, 62))
+                 : hsl(c.h, c.s * 0.9, Math.max(c.l - 7, 6)),
+    cellFront: hsl(c.h, c.s, c.l + 8),
+    cellBack:  hsl(c.h, c.s, c.l + 4),
+    rule:      hsl(c.h, c.s, c.l + 10),
+    ink:       pale ? "#14141A" : "#FFFFFF",
+    inkMuted:  pale ? hsl(c.h, c.s * 0.55, 26) : hsl(c.h, Math.min(c.s, 42), c.l + 46),
+    inkFaint:  pale ? hsl(c.h, c.s * 0.5, 40)  : hsl(c.h, Math.min(c.s, 38), c.l + 34),
+    onActive:  hex
+  };
+}
+
+/* =================================================================
+   STATE
+   Seeded to a plausible mid-set position. In the real app this is the
+   output of folding the event log, never stored directly.
+   ================================================================= */
+var RN = ["I","II","III","IV","V","VI"];
+
+function makeTeam(cfg) {
+  return {
+    name: cfg.name, color: cfg.color, captain: cfg.captain,
+    liberos: cfg.liberos.slice(),
+    roster: cfg.roster.slice().sort(function(a,b){ return (+a) - (+b); }),
+    points: cfg.points, sets: cfg.sets,
+    subsUsed: cfg.subsUsed.slice(),
+    serviceTurns: cfg.serviceTurns,
+    liberoOnCourt: null,
+    liberoOwes: {},
+    slotOrigin: cfg.slotOrigin || {},
+    slots: cfg.lineup.map(function(n, i) {
+      return { rn: RN[i], position: 0, current: n, history: [] };
+    })
+  };
+}
+
+var S = {
+  theme: "dark",
+  setNumber: 3,
+  serveTeam: "home",
+  selection: null,
+  hintOpen: false,
+  log: [],
+  home: makeTeam({
+    name: "Avon Lake", color: "#14284B", captain: "12", liberos: ["30"],
+    lineup: ["12","7","21","2","15","9"],
+    roster: ["12","7","21","2","15","9","4","5","18","23","10","6","11","3","17","30"],
+    points: 20, sets: 1, serviceTurns: 1,
+    subsUsed: [{exceptional:false},{exceptional:false},{exceptional:false}],
+    slotOrigin: { "4": 3 }
+  }),
+  visitor: makeTeam({
+    name: "Amherst", color: "#8C1D2C", captain: "11", liberos: ["24"],
+    lineup: ["3","11","8","22","6","14"],
+    roster: ["3","11","8","22","6","14","1","17","20","9","13","5","24"],
+    points: 17, sets: 1, serviceTurns: 0,
+    subsUsed: []
+  })
+};
+S.home.slots[3].history = ["4","2","4"];   /* 4 out, 2 in, 4 back, 2 in again */
+
+/* Initial court positions.
+   Serving team: slot N sits at court position N.
+   Receiving team: slot N sits at position N+1, because they rotate once when
+   they first win the serve, which brings slot I to position 1. Confirmed by
+   the NFHS guide: a receiving team's slot I player is the right front. */
+function seedPositions(team, servesFirst) {
+  team.slots.forEach(function(s, i) {
+    s.position = servesFirst ? i + 1 : ((i + 1) % 6) + 1;
+  });
+}
+seedPositions(S.home, true);
+seedPositions(S.visitor, false);
+
+/* =================================================================
+   RULES
+   ================================================================= */
+function teamSide(team) { return team === S.home ? "home" : "visitor"; }
+function rotate(team) {
+  team.slots.forEach(function(s) { s.position = ((s.position - 2 + 6) % 6) + 1; });
+}
+function slotAtPosition(team, pos) {
+  return team.slots.filter(function(s) { return s.position === pos; })[0];
+}
+function server(team)     { return slotAtPosition(team, 1); }
+function onCourt(team, j) { return team.slots.some(function(s) { return s.current === j; }); }
+function isLibero(team,j) { return team.liberos.indexOf(j) !== -1; }
+function backRow(pos)     { return pos === 1 || pos === 5 || pos === 6; }
+
+function cellAllowed(team, slot) {
+  var sel = S.selection;
+  if (!sel || sel.kind !== "chip" || sel.team !== teamSide(team)) return true;
+  var j = sel.value;
+  if (isLibero(team, j)) return backRow(slot.position);
+  var origin = team.slotOrigin[j];
+  return origin === undefined || team.slots.indexOf(slot) === origin;
+}
+function chipAllowed(team, j) {
+  var sel = S.selection;
+  if (!sel || sel.kind !== "cell" || sel.team !== teamSide(team)) return true;
+  if (isLibero(team, j)) {
+    if (team.liberoOnCourt && team.liberoOnCourt !== j) return false;
+    return backRow(sel.value.position);
+  }
+  var origin = team.slotOrigin[j];
+  return origin === undefined || team.slots.indexOf(sel.value) === origin;
+}
+
+/* =================================================================
+   RENDER
+   ================================================================= */
+/* Court position to grid cell, row-major over two columns.
+   Home has the net on its right, so its front column is on the right.
+   Visitor mirrors, putting the two front rows against the divider. */
+var GRID = { home: [5, 4, 6, 3, 1, 2], visitor: [2, 1, 3, 6, 4, 5] };
+var FRONT_ROW = [2, 3, 4];
+
+function triangle(em, color) {
+  return '<svg width="1em" height="0.88em" viewBox="0 0 20 18" style="font-size:' + em +
+         '" aria-hidden="true"><polygon points="10,1.5 18.5,16.5 1.5,16.5" fill="none" stroke="' +
+         color + '" stroke-width="1.6"/></svg>';
+}
+function ballIcon(color) {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="1.7" aria-hidden="true">' +
+         '<circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 0 0 18"/><path d="M4 8a15 15 0 0 0 16 8"/></svg>';
+}
+
+function renderPanel(side) {
+  var t = S[side];
+  var p = derivePalette(t.color, S.theme);
+  var serving = S.serveTeam === side;
+  var el = document.getElementById("panel-" + side);
+  el.style.background = serving ? p.base : p.dim;
+
+  var cells = GRID[side].map(function(pos) {
+    var slot = slotAtPosition(t, pos);
+    var isServer = serving && pos === 1;
+    var selected = S.selection && S.selection.team === side &&
+                   S.selection.kind === "cell" && S.selection.value === slot;
+    var active = selected || isServer;
+    var bg  = active ? "var(--cell-active-bg)" : (FRONT_ROW.indexOf(pos) !== -1 ? p.cellFront : p.cellBack);
+    var fg  = active ? p.onActive : p.ink;
+    var sub = active ? p.inkFaint : p.inkMuted;
+    var dim = cellAllowed(t, slot) ? "" : "opacity:.28;cursor:default;";
+    var lib = isLibero(t, slot.current) ? triangle("1em", sub) : "";
+    var hist = slot.history.length
+      ? '<span class="cell-history" style="color:' + sub + '">' + slot.history.join(" ") + "</span>"
+      : "<span></span>";
+    return '<div class="cell" data-side="' + side + '" data-pos="' + pos + '" style="background:' + bg + ";" + dim + '">' +
+             '<div class="cell-top" style="color:' + sub + '">' + slot.rn + lib + "</div>" +
+             '<div class="cell-bottom"><span class="cell-number" style="color:' + fg + '">' + slot.current + "</span>" + hist + "</div>" +
+           "</div>";
+  }).join("");
+
+  var chips = t.roster.map(function(j) {
+    var here = onCourt(t, j);
+    var sel  = S.selection && S.selection.team === side &&
+               S.selection.kind === "chip" && S.selection.value === j;
+    var state = here ? "oncourt" : (!chipAllowed(t, j) ? "ineligible" : "available");
+    var bg, fg, bd = "transparent";
+    if (here)     { bg = "transparent"; fg = p.inkMuted; bd = p.rule; }
+    else if (sel) { bg = "var(--cell-active-bg)"; fg = p.onActive; }
+    else          { bg = p.cellBack; fg = p.ink; }
+    var origin = t.slotOrigin[j];
+    var badge = (!here && origin !== undefined)
+      ? '<span class="chip-slot" style="color:' + (sel ? p.inkFaint : p.inkMuted) + '">' + RN[origin] + "</span>" : "";
+    var lib = isLibero(t, j) ? triangle("0.75em", fg) : "";
+    return '<div class="chip" data-side="' + side + '" data-jersey="' + j + '" data-state="' + state +
+           '" style="background:' + bg + ";color:" + fg + ";border-color:" + bd + '">' + lib + j + badge + "</div>";
+  }).join("");
+
+  var subs = "";
+  for (var i = 0; i < 18; i++) {
+    var u = t.subsUsed[i];
+    subs += '<span class="sub-n" style="color:' +
+            (u ? (u.exceptional ? "var(--flag-amber)" : p.ink) : p.rule) + '">' + (i + 1) + "</span>";
+  }
+
+  /* Third of three serve indications: panel tint, inverted cell, this line. */
+  var serveLine = serving
+    ? ballIcon(p.ink) + '<span style="color:' + p.ink + '">serving #' + server(t).current + "</span>"
+    : '<span style="color:' + p.inkMuted + '">receiving</span>';
+
+  el.innerHTML =
+    '<div class="panel-head">' +
+      '<span class="panel-name" style="color:' + p.ink + '">' + t.name + "</span>" +
+      '<span class="panel-sets" style="color:' + p.inkMuted + '">sets ' + t.sets + "</span>" +
+    "</div>" +
+    '<div class="panel-body">' +
+      '<div class="score-block" data-score="' + side + '">' +
+        '<span class="score-value" style="color:' + p.ink + '">' + t.points + "</span>" +
+        '<span class="serve-line">' + serveLine + "</span>" +
+      "</div>" +
+      '<div class="court">' + cells + "</div>" +
+    "</div>" +
+    '<div class="roster">' + chips + "</div>" +
+    '<div class="subs" style="border-top-color:' + p.rule + '">' + subs + "</div>";
+}
+
+function render() {
+  renderPanel("home");
+  renderPanel("visitor");
+  document.getElementById("set-number").textContent = S.setNumber;
+  document.getElementById("match-score").textContent = S.home.sets + "\u2013" + S.visitor.sets;
+  document.getElementById("undo-btn").disabled = S.log.length === 0;
+  var hint = document.getElementById("hint");
+  hint.hidden = !S.hintOpen;
+  hint.innerHTML =
+    "Tap a score to award that team the point. Tap the same thing twice to clear a selection.<br>" +
+    "Substitutions work in either direction: tap an available number then the player coming out, or tap " +
+    "a player on court then her replacement. A player who has already been on this set can only return " +
+    "to her own serve-order slot, shown on her chip, so other spots dim out. Dimmed means not tappable; " +
+    "use Fix lineup to override. Liberos are marked with a triangle and can only enter the back row. " +
+    "Libero replacements do not count against the 18.";
+  bind();
+}
+
+/* =================================================================
+   ACTIONS
+   ================================================================= */
+function snapshot() { return JSON.stringify({ home: S.home, visitor: S.visitor, serveTeam: S.serveTeam }); }
+
+function awardPoint(side) {
+  S.log.push(snapshot());
+  S.selection = null;
+  var t = S[side];
+  t.points += 1;
+  if (S.serveTeam !== side) { rotate(t); t.serviceTurns += 1; S.serveTeam = side; }
+  render();
+}
+
+function substitute(side, slot, jerseyIn) {
+  S.log.push(snapshot());
+  var t = S[side], out = slot.current, idx = t.slots.indexOf(slot);
+
+  if (isLibero(t, jerseyIn)) {
+    /* LIBERO_REPLACE in. Never counts against the 18. */
+    t.liberoOnCourt = jerseyIn;
+    t.liberoOwes[jerseyIn] = out;
+    t.slotOrigin[out] = idx;
+    slot.history.push(out);
+    slot.current = jerseyIn;
+
+  } else if (t.liberoOnCourt === out) {
+    /* LIBERO_REPLACE out: the owed player returns. */
+    delete t.liberoOwes[out];
+    t.liberoOnCourt = null;
+    slot.history.push(out);
+    slot.current = jerseyIn;
+    delete t.slotOrigin[jerseyIn];
+
+  } else if (t.liberoOnCourt && t.liberoOwes[t.liberoOnCourt] === jerseyIn && backRow(slot.position)) {
+    /* COMPOUND EXCHANGE. Looks like one substitution, is two libero
+       replacements: the owed player returns for the libero, then the libero
+       enters for the player leaving. Does not touch the 18. */
+    var lib = t.liberoOnCourt;
+    var libSlot = t.slots.filter(function(s) { return s.current === lib; })[0];
+    libSlot.history.push(lib);
+    libSlot.current = jerseyIn;
+    delete t.slotOrigin[jerseyIn];
+    slot.history.push(out);
+    slot.current = lib;
+    t.liberoOwes = {}; t.liberoOwes[lib] = out;
+    t.slotOrigin[out] = idx;
+
+  } else {
+    /* Ordinary SUBSTITUTION. */
+    if (t.subsUsed.length >= 18) { S.log.pop(); return; }
+    slot.history.push(out);
+    slot.current = jerseyIn;
+    t.slotOrigin[out] = idx;
+    delete t.slotOrigin[jerseyIn];
+    t.subsUsed.push({ exceptional: false });
+  }
+  S.selection = null;
+  render();
+}
+
+function undo() {
+  var snap = S.log.pop();
+  if (!snap) return;
+  var prev = JSON.parse(snap);
+  S.home = prev.home; S.visitor = prev.visitor; S.serveTeam = prev.serveTeam;
+  S.selection = null;
+  render();
+}
+
+/* =================================================================
+   BINDING
+   ================================================================= */
+function bind() {
+  document.querySelectorAll("[data-score]").forEach(function(el) {
+    el.onclick = function() { awardPoint(el.dataset.score); };
+  });
+  document.querySelectorAll(".chip").forEach(function(el) {
+    el.onclick = function() {
+      var side = el.dataset.side, j = el.dataset.jersey, t = S[side];
+      if (onCourt(t, j) || !chipAllowed(t, j)) return;
+      var sel = S.selection;
+      if (sel && sel.team === side && sel.kind === "chip" && sel.value === j) { S.selection = null; return render(); }
+      if (sel && sel.team === side && sel.kind === "cell") return substitute(side, sel.value, j);
+      S.selection = { team: side, kind: "chip", value: j };
+      render();
+    };
+  });
+  document.querySelectorAll(".cell").forEach(function(el) {
+    el.onclick = function() {
+      var side = el.dataset.side, t = S[side], slot = slotAtPosition(t, +el.dataset.pos);
+      if (!cellAllowed(t, slot)) return;
+      var sel = S.selection;
+      if (sel && sel.team === side && sel.kind === "cell" && sel.value === slot) { S.selection = null; return render(); }
+      if (sel && sel.team === side && sel.kind === "chip") return substitute(side, slot, sel.value);
+      S.selection = { team: side, kind: "cell", value: slot };
+      render();
+    };
+  });
+}
+
+document.getElementById("undo-btn").onclick = undo;
+document.getElementById("more-btn").onclick = function() { S.hintOpen = !S.hintOpen; render(); };
+document.getElementById("theme-btn").onclick = function() {
+  S.theme = S.theme === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", S.theme);
+  this.textContent = S.theme === "dark" ? "Light" : "Dark";
+  render();
+};
+
+render();
+</script>
+</body>
+</html>

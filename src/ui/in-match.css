@@ -1,0 +1,395 @@
+/* ---------------------------------------------------------------------------
+   IN-MATCH SCREEN
+   Ported from docs/refeerence/in-match.html. Every color, size, radius and
+   spacing value below is the reference's own. Component selectors carry a
+   `.app ` prefix so they cannot reach the other screens, which still use
+   index.css; nothing else about them is changed.
+
+   LAYOUT MODEL: the app is locked to the iPad landscape aspect, 1180 by 820.
+   .stage sizes itself to fit the viewport and centres; .app inside it is a size
+   container, and every dimension is expressed in cqh, one percent of the stage
+   height. Do NOT replace this with a fluid layout: the proportions between the
+   score, the court and the roster row ARE the design.
+   --------------------------------------------------------------------------- */
+
+/* 1. CHROME TOKENS. Team colors are derived in JS, not declared here. */
+:root {
+  --font-sans: ui-sans-serif, -apple-system, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  --flag-amber: #E0952A; /* rule-broken markers only, identical in both themes */
+}
+
+[data-theme='dark'] {
+  --app-bg:         #0B0B0F;
+  --rail-bg:        #101014;
+  --border:         #1E1E26;
+  --border-strong:  #30303A;
+  --text-primary:   #F2F2F5;
+  --text-secondary: #9A9AA4;
+  --text-muted:     #6E6E78;
+  --control-text:   #B8B8C2;
+  --control-hover:  #1A1A21;
+  --cell-active-bg: #FFFFFF;
+}
+
+[data-theme='light'] {
+  --app-bg:         #EFEFF2;
+  --rail-bg:        #FFFFFF;
+  --border:         #E0E0E5;
+  --border-strong:  #C9C9D1;
+  --text-primary:   #16161A;
+  --text-secondary: #55555F;
+  --text-muted:     #85858F;
+  --control-text:   #34343C;
+  --control-hover:  #E8E8ED;
+  --cell-active-bg: #FFFFFF;
+}
+
+/* The reference sets these on html/body. Scoped to the in-match route so the
+   other screens keep their own background until they are ported too. */
+body.in-match-host {
+  overflow: hidden;
+  background: var(--app-bg);
+  font-family: var(--font-sans);
+  touch-action: manipulation;
+}
+body.in-match-host #root { display: flex; }
+
+/* 2. STAGE. Locks the app to iPad landscape proportions and centres it. */
+.stage {
+  width: min(100vw, calc(100dvh * 1180 / 820));
+  height: min(100dvh, calc(100vw * 820 / 1180));
+  margin: auto;
+}
+
+.app {
+  height: 100%;
+  container-type: size;
+  display: flex;
+  flex-direction: column;
+  background: var(--app-bg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+
+  /* Every size below is a share of the stage height. */
+  --s1: 0.5cqh;
+  --s2: 1cqh;
+  --s3: 1.5cqh;
+  --s4: 2cqh;
+
+  --type-score:      18cqh;
+  --type-team:       max(15px, 2.9cqh);
+  --type-cell:       max(24px, 6cqh);
+  --type-cell-label: max(13px, 2.3cqh);
+  --type-cell-hist:  max(12px, 1.95cqh);
+  --type-chip:       max(14px, 2.6cqh);
+  --type-body:       max(12px, 1.9cqh);
+  --type-label:      max(11px, 1.7cqh);
+  --type-micro:      max(12px, 2cqh);
+
+  --radius-panel:   2cqh;
+  --radius-cell:    1.2cqh;
+  --radius-chip:    0.85cqh;
+  --radius-control: 1.1cqh;
+}
+
+/* 3. CONTEXT RAIL */
+.app .rail {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s2) var(--s4);
+  background: var(--rail-bg);
+  border-bottom: 1px solid var(--border);
+}
+.app .rail-left, .app .rail-right { display: flex; align-items: center; gap: var(--s3); }
+.app .rail-level {
+  font-size: var(--type-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.app .rail-sets  { font-size: var(--type-label); color: var(--text-secondary); }
+.app .rail-clock { font-size: var(--type-label); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.app .rail-icon  { color: var(--text-muted); display: flex; }
+.app .rail-icon svg { width: 2.1cqh; height: 2.1cqh; }
+
+/* 4. COURT AREA */
+.app .court-area {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  gap: var(--s2);
+  padding: var(--s2);
+  min-height: 0;
+}
+
+.app .panel {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-panel);
+  padding: var(--s3) var(--s3) var(--s2);
+  transition: background-color 140ms ease;
+}
+
+/* Team name stays outboard-left on BOTH sides. Only the body mirrors. */
+.app .panel-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.app .panel-name { font-size: var(--type-team); font-weight: 600; }
+.app .panel-sets { font-size: var(--type-label); }
+
+/* Score outboard, court inboard, so the two front rows face each other. */
+.app .panel-body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-height: 0;
+}
+.app .panel[data-side='visitor'] .panel-body  { flex-direction: row-reverse; }
+.app .panel[data-side='visitor'] .score-block { align-items: flex-end; }
+.app .panel[data-side='visitor'] .serve-line  { flex-direction: row-reverse; }
+
+/* --- the score IS the button --- */
+.app .score-block {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--s2);
+  border-radius: var(--radius-cell);
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: inherit;
+}
+.app .score-block:active { background: rgba(127, 127, 127, 0.14); }
+.app .score-value {
+  font-size: var(--type-score);
+  line-height: 0.84;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.app .serve-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-top: var(--s2);
+  font-size: var(--type-body);
+}
+.app .serve-line svg { width: 2.5cqh; height: 2.5cqh; }
+
+/* --- court grid --- */
+.app .court {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, 19cqh);
+  gap: 0.9cqh;
+}
+.app .cell {
+  height: 18.4cqh;
+  border-radius: var(--radius-cell);
+  padding: 1cqh 1.4cqh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background-color 120ms ease, opacity 120ms ease;
+  border: 0;
+  font-family: inherit;
+  text-align: left;
+}
+.app .cell-top    { display: flex; align-items: center; gap: 0.5cqh; font-size: var(--type-cell-label); }
+.app .cell-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6cqh; }
+.app .cell-number { font-size: var(--type-cell); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
+.app .cell-history { font-size: var(--type-cell-hist); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* --- roster row: fixed slots, nine across --- */
+.app .roster {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 0.7cqh;
+  margin-top: var(--s3);
+}
+.app .panel[data-side='visitor'] .roster { direction: rtl; }
+.app .chip {
+  direction: ltr;
+  height: 5cqh;
+  border-radius: var(--radius-chip);
+  border: 1.5px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3cqh;
+  font-size: var(--type-chip);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: opacity 120ms ease, background-color 120ms ease;
+  font-family: inherit;
+  padding: 0;
+}
+.app .chip-slot { font-size: max(11px, 1.85cqh); align-self: flex-end; margin-bottom: 0.6cqh; }
+.app .chip[data-state='oncourt']    { background: transparent; cursor: default; }
+.app .chip[data-state='ineligible'] { opacity: 0.28; cursor: default; }
+
+/* --- substitution budget --- */
+.app .subs {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--s2);
+  padding-top: var(--s1);
+  border-top: 1px solid;
+}
+.app .sub-n { font-size: var(--type-micro); font-variant-numeric: tabular-nums; }
+
+/* 5. CENTRE DIVIDER */
+.app .divider {
+  flex: 0 0 7cqh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+}
+.app .divider-label {
+  font-size: var(--type-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.app .divider-set   { font-size: 5cqh; line-height: 1; color: var(--text-primary); font-weight: 600; }
+.app .divider-rule  { width: 1px; height: 7cqh; background: var(--border); }
+.app .divider-match { font-size: var(--type-label); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+/* 6. ACTION BAR. Spatially mirrored: home left, visitor right, shared centre. */
+.app .bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s2) var(--s3);
+  background: var(--rail-bg);
+  border-top: 1px solid var(--border);
+}
+.app .bar-group { display: flex; gap: var(--s1); flex: 1 1 0; }
+.app .bar-group.right  { justify-content: flex-end; }
+.app .bar-group.centre { flex: 0 0 auto; }
+
+.app .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8cqh;
+  padding: 1.2cqh 2cqh;
+  border-radius: var(--radius-control);
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--control-text);
+  font-family: inherit;
+  font-size: var(--type-body);
+  font-weight: 400;
+  justify-content: flex-start;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease;
+}
+.app .btn svg { width: 2.1cqh; height: 2.1cqh; }
+.app .btn:active { background: var(--control-hover); }
+.app .btn:disabled { opacity: 0.35; cursor: default; }
+.app .btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+.app .hint {
+  flex: 0 0 auto;
+  padding: var(--s2) var(--s4);
+  border-top: 1px solid var(--border);
+  background: var(--rail-bg);
+  color: var(--text-secondary);
+  font-size: var(--type-label);
+  line-height: 1.6;
+}
+.app .hint[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) { .app * { transition: none !important; } }
+
+/* ---------------------------------------------------------------------------
+   7. NOT IN THE REFERENCE
+   The reference's "more" button opens a hint panel. Our screen also needs the
+   overflow actions, the set and match end prompts, the rule warnings, and the
+   add-player sheet. All of these reuse the reference's own .hint slot below the
+   action bar, so nothing steals height from the court, and every value below
+   comes from 04-design-tokens.md. No new colors.
+   --------------------------------------------------------------------------- */
+
+/* 04: "Team-scoped buttons in the action bar carry that team's rule color as
+   their border, so the operator knows which side a control belongs to without
+   reading the label." The reference file does not do this; the tokens document
+   and both approved screenshots do. */
+.app .bar-group .btn[data-team] { border-color: var(--team-rule); }
+
+.app .hint-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+.app .hint-row + .hint-row { margin-top: var(--s2); }
+.app .hint-row .spacer { flex: 1 1 auto; }
+.app .hint-actions { display: flex; gap: var(--s1); flex-wrap: wrap; }
+.app .hint-text { color: var(--text-secondary); }
+
+/* Amber means exactly one thing: something happened outside the normal rules. */
+.app .hint-warn { color: var(--flag-amber); }
+
+.app .sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s4);
+}
+.app .sheet {
+  background: var(--rail-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  min-width: 44cqh;
+}
+.app .sheet-title { font-size: var(--type-team); font-weight: 600; color: var(--text-primary); }
+.app .sheet-note  { font-size: var(--type-label); color: var(--text-muted); line-height: 1.6; }
+.app .sheet-row   { display: flex; gap: var(--s2); align-items: center; }
+.app .sheet input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1.2cqh 2cqh;
+  border-radius: var(--radius-control);
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--type-body);
+  font-variant-numeric: tabular-nums;
+}
+.app .sheet input:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+/* The stage is the positioning context for the sheet scrim. */
+.app { position: relative; }

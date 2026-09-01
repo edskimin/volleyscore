@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { referencedNumbers } from './model/reducer'
 import { OTHER, type MatchSetup, type SetStarted, type TeamSide } from './model/types'
 import { useMatchStore } from './state/store'
+import { useTheme } from './ui/theme'
 import Adjustment from './ui/Adjustment'
 import Closeout from './ui/Closeout'
 import Home from './ui/Home'
@@ -68,17 +69,18 @@ function reconcileDraft(draft: SetDraft, setup: MatchSetup): SetDraft {
 
 export default function App() {
   const store = useMatchStore()
+  const [theme, toggleTheme] = useTheme()
   const [draft, setDraft] = useState<SetDraft | null>(null)
   // `null` means the operator has not navigated yet, so the route is derived from the
   // match itself. Resuming an in-progress match on launch is therefore not an effect
   // and never costs a second render.
   const [route, setRoute] = useState<Route | null>(null)
 
-  if (store.loading) return <div className="app" />
+  if (store.loading) return <div className="app-root" />
 
   if (store.error) {
     return (
-      <div className="app">
+      <div className="app-root">
         <div className="screen storage-error">
           <div className="card">
             <h1>Local storage is unavailable</h1>
@@ -118,7 +120,7 @@ export default function App() {
 
   if (view === 'matchSetup') {
     return (
-      <div className="app">
+      <div className="app-root">
         <MatchSetupScreen
           onCancel={() => setRoute('home')}
           onStart={async (setup) => {
@@ -135,7 +137,7 @@ export default function App() {
   if (view === 'editSetup' && store.record) {
     const back = store.state?.setInProgress ? 'inMatch' : 'setSetup'
     return (
-      <div className="app">
+      <div className="app-root">
         <MatchSetupScreen
           initial={store.record.setup}
           title="Edit teams & setup"
@@ -168,7 +170,7 @@ export default function App() {
           ? draft
           : setDefaults(record.setup, priorSets, setNumber)
       return (
-        <div className="app">
+        <div className="app-root">
           <SetSetupScreen
             setup={record.setup}
             setsWon={state.setsWon}
@@ -190,7 +192,7 @@ export default function App() {
 
     if (view === 'adjustment') {
       return (
-        <div className="app">
+        <div className="app-root">
           <Adjustment
             setup={record.setup}
             state={state}
@@ -206,7 +208,7 @@ export default function App() {
 
     if (view === 'closeout') {
       return (
-        <div className="app">
+        <div className="app-root">
           <Closeout
             setup={record.setup}
             state={state}
@@ -224,7 +226,7 @@ export default function App() {
 
     if (view === 'sheet') {
       return (
-        <div className="app">
+        <div className="app-root">
           <Scoresheet
             setup={record.setup}
             events={record.events}
@@ -235,8 +237,10 @@ export default function App() {
     }
 
     if (view === 'inMatch') {
+      // No .app-root wrapper: the in-match screen supplies its own .stage/.app,
+      // which is the reference's fixed 1180x820 layout container.
       return (
-        <div className="app">
+        <>
           <InMatch
             setup={record.setup}
             state={state}
@@ -244,6 +248,8 @@ export default function App() {
             append={store.append}
             undoLast={store.undoLast}
             canUndo={store.canUndo}
+            theme={theme}
+            onToggleTheme={toggleTheme}
             onSheet={() => setRoute('sheet')}
             onEditSetup={() => setRoute('editSetup')}
             onCloseout={() => setRoute('closeout')}
@@ -251,13 +257,13 @@ export default function App() {
             onExport={() => void store.exportMatch()}
             onHome={() => setRoute('home')}
           />
-        </div>
+        </>
       )
     }
   }
 
   return (
-    <div className="app">
+    <div className="app-root">
       <Home
         activeMatchId={store.record?.matchId ?? null}
         onNew={() => setRoute('matchSetup')}

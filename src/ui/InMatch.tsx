@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { servingSlotIndex } from '../model/reducer'
 import { ineligibleReason, resolveExchange } from '../model/selection'
@@ -10,9 +10,12 @@ import {
   type EventBody,
   type MatchEvent,
   type MatchSetup,
+  type Slot,
   type SlotIndex,
   type TeamSide,
 } from '../model/types'
+import './in-match.css'
+import { derivePalette, type TeamPalette, type Theme } from './palette'
 
 interface Props {
   setup: MatchSetup
@@ -21,6 +24,8 @@ interface Props {
   append: (...bodies: EventBody[]) => void
   undoLast: () => void
   canUndo: boolean
+  theme: Theme
+  onToggleTheme: () => void
   onSheet: () => void
   onEditSetup: () => void
   onCloseout: () => void
@@ -29,49 +34,102 @@ interface Props {
   onHome: () => void
 }
 
-/**
- * Court position to grid cell, in DOM order for a three-row, two-column grid.
- *
- * Each team's front row sits against the center divider, so the two front rows face
- * each other across the net. Home faces right, so its right back (position 1) is the
- * bottom of the outer column; the visitor faces left, so its position 1 is the top of
- * its outer column. The two serving corners end up diagonal, which is correct.
- */
+/* Court position to grid cell, row-major over two columns.
+   Home has the net on its right, so its front column is on the right.
+   Visitor mirrors, putting the two front rows against the divider. */
 const GRID: Record<TeamSide, CourtPosition[]> = {
   home: [5, 4, 6, 3, 1, 2],
   visitor: [2, 1, 3, 6, 4, 5],
 }
+const FRONT_ROW: CourtPosition[] = [2, 3, 4]
 
 type Selection =
-  | { side: TeamSide; kind: 'bench'; player: string }
-  | { side: TeamSide; kind: 'court'; slot: SlotIndex }
+  | { side: TeamSide; kind: 'chip'; value: string }
+  | { side: TeamSide; kind: 'cell'; value: SlotIndex }
   | null
 
-export default function InMatch({
-  setup,
-  state,
-  events,
-  append,
-  undoLast,
-  canUndo,
-  onSheet,
-  onEditSetup,
-  onCloseout,
-  onAdjust,
-  onExport,
-  onHome,
-}: Props) {
+function Triangle({ em, color }: { em: string; color: string }) {
+  return (
+    <svg
+      width="1em"
+      height="0.88em"
+      viewBox="0 0 20 18"
+      style={{ fontSize: em }}
+      aria-hidden="true"
+    >
+      <polygon points="10,1.5 18.5,16.5 1.5,16.5" fill="none" stroke={color} strokeWidth="1.6" />
+    </svg>
+  )
+}
+
+function BallIcon({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a15 15 0 0 0 0 18" />
+      <path d="M4 8a15 15 0 0 0 16 8" />
+    </svg>
+  )
+}
+
+const icons = {
+  save: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 4h9l5 5v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" /><path d="M8 4v5h6" /><circle cx="12" cy="15" r="2" /></svg>
+  ),
+  offline: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M3 3l18 18" /><path d="M9.5 17.5a3.5 3.5 0 0 1 5 0" /><path d="M6 14a8 8 0 0 1 3-2" /><path d="M18 14a8 8 0 0 0-6.5-2.3" /></svg>
+  ),
+  timeout: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8" /><path d="M12 9v4" /><path d="M9 2h6" /></svg>
+  ),
+  replay: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 21V4" /><path d="M5 5h13l-2.5 4L18 13H5" /></svg>
+  ),
+  undo: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 13L4 9l5-4" /><path d="M4 9h9a6 6 0 0 1 0 12h-3" /></svg>
+  ),
+  sheet: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h8l5 5v13H6z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h6" /></svg>
+  ),
+  more: (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="18" cy="12" r="1.7" /></svg>
+  ),
+}
+
+const HINT =
+  'Tap a score to award that team the point. Tap the same thing twice to clear a selection. ' +
+  'Substitutions work in either direction: tap an available number then the player coming out, or tap ' +
+  'a player on court then her replacement. A player who has already been on this set can only return ' +
+  'to her own serve-order slot, shown on her chip, so other spots dim out. Dimmed means not tappable; ' +
+  'use Fix lineup to override. Liberos are marked with a triangle and can only enter the back row. ' +
+  'Libero replacements do not count against the 18.'
+
+export default function InMatch(props: Props) {
+  const { setup, state, events, append, undoLast, canUndo, theme } = props
   const [sel, setSel] = useState<Selection>(null)
-  const [menu, setMenu] = useState(false)
+  const [panel, setPanel] = useState<'none' | 'hint' | 'menu'>('none')
   const [adding, setAdding] = useState<TeamSide | null>(null)
   const [newNumber, setNewNumber] = useState('')
 
-  // Wall clock for the sheet's start and end times; a minute of drift is immaterial.
   const [clock, setClock] = useState(() => new Date().toTimeString().slice(0, 5))
   useEffect(() => {
     const id = setInterval(() => setClock(new Date().toTimeString().slice(0, 5)), 20_000)
     return () => clearInterval(id)
   }, [])
+
+  // The stage owns the whole viewport while this screen is mounted.
+  useEffect(() => {
+    document.body.classList.add('in-match-host')
+    return () => document.body.classList.remove('in-match-host')
+  }, [])
+
+  const palettes: Record<TeamSide, TeamPalette> = useMemo(
+    () => ({
+      home: derivePalette(setup.home.colorPrimary, theme),
+      visitor: derivePalette(setup.visitor.colorPrimary, theme),
+    }),
+    [setup.home.colorPrimary, setup.visitor.colorPrimary, theme],
+  )
 
   function exchange(side: TeamSide, player: string, slot: SlotIndex) {
     const result = resolveExchange(state.teams[side], side, player, slot)
@@ -80,414 +138,408 @@ export default function InMatch({
     setSel(null)
   }
 
-  function tapBench(side: TeamSide, player: string) {
-    if (sel?.kind === 'bench' && sel.side === side && sel.player === player) return setSel(null)
-    if (sel?.kind === 'court' && sel.side === side) return exchange(side, player, sel.slot)
-    setSel({ side, kind: 'bench', player })
+  function tapChip(side: TeamSide, player: string) {
+    if (sel?.kind === 'chip' && sel.side === side && sel.value === player) return setSel(null)
+    if (sel?.kind === 'cell' && sel.side === side) return exchange(side, player, sel.value)
+    setSel({ side, kind: 'chip', value: player })
   }
 
-  function tapCourt(side: TeamSide, slot: SlotIndex) {
-    if (sel?.kind === 'court' && sel.side === side && sel.slot === slot) return setSel(null)
-    if (sel?.kind === 'bench' && sel.side === side) return exchange(side, sel.player, slot)
-    setSel({ side, kind: 'court', slot })
+  function tapCell(side: TeamSide, slot: SlotIndex) {
+    if (sel?.kind === 'cell' && sel.side === side && sel.value === slot) return setSel(null)
+    if (sel?.kind === 'chip' && sel.side === side) return exchange(side, sel.value, slot)
+    setSel({ side, kind: 'cell', value: slot })
   }
 
-  const setLine = state.completedSets.map((s) => `${s.score.home}–${s.score.visitor}`).join(' · ')
+  const setLine =
+    state.completedSets.map((s) => `${s.score.home}–${s.score.visitor}`).join(' · ') +
+    (state.completedSets.length > 0 ? ' · ' : '') +
+    'in progress'
 
-  return (
-    <div className="screen match-screen" onClick={() => menu && setMenu(false)}>
-      <header className="match-head">
-        <span className="eyebrow">{setup.level === 'jv' ? 'JV' : setup.level}</span>
-        <span className="num muted">{setLine || 'set 1'}</span>
-        {state.setComplete && <span className="badge">set point reached</span>}
-        <div className="spacer" />
-        <span className="num faint">{clock}</span>
-        <button className="btn ghost sm" onClick={onHome}>
-          Matches
-        </button>
-      </header>
+  const endTime = () => new Date().toTimeString().slice(0, 5)
+  const matchWinner: TeamSide = state.setsWon.home > state.setsWon.visitor ? 'home' : 'visitor'
+  const matchEnded = events.some((e) => e.type === 'MATCH_ENDED')
 
-      <div className="panels">
-        {(['home', 'visitor'] as TeamSide[]).map((side) => {
-          const team = state.teams[side]
-          const snap = setup[side]
-          const serving = state.serveTeam === side
-          const server = team.slots[servingSlotIndex(team)]
-          const onCourtNumbers = new Set(team.slots.map((s) => s.current))
-          const selectedSlot = sel?.kind === 'court' && sel.side === side ? sel.slot : null
-          const selectedBench = sel?.kind === 'bench' && sel.side === side ? sel.player : null
+  function renderPanel(side: TeamSide) {
+    const t = state.teams[side]
+    const snap = setup[side]
+    const p = palettes[side]
+    const serving = state.serveTeam === side
+    const roster = [...state.rosters[side]].sort((a, b) => Number(a.number) - Number(b.number))
+    const selCell = sel?.kind === 'cell' && sel.side === side ? sel.value : null
+    const selChip = sel?.kind === 'chip' && sel.side === side ? sel.value : null
+    const onCourtNumbers = new Set(t.slots.map((s) => s.current))
+    const isLibero = (j: string) => t.liberoDesignated.includes(j)
 
-          return (
-            <section
-              key={side}
-              className={`panel ${side}${serving ? ' serving' : ' receiving'}`}
-              style={
-                {
-                  '--team': snap.colorPrimary,
-                  '--team-text': snap.colorText,
-                } as React.CSSProperties
-              }
-            >
-              <div className="panel-head">
-                <b className="tname">{snap.name}</b>
-                <span className="sets num">
-                  {state.setsWon[side]} {state.setsWon[side] === 1 ? 'set' : 'sets'}
-                </span>
-              </div>
-
-              <div className="scoreline">
-                {/* The score is the button. It is what the eye is already on, so
-                    reading and recording collapse into one object. */}
-                <button
-                  className="score num"
-                  onClick={() => append({ type: 'RALLY_WON', team: side })}
-                  aria-label={`Point ${snap.name}`}
-                >
-                  {state.score[side]}
-                </button>
-
-                <div className="court">
-                  {GRID[side].map((pos) => {
-                    const idx = team.slots.findIndex((s) => s.position === pos) as SlotIndex
-                    const slot = team.slots[idx]
-                    if (!slot) return <span key={pos} className="cell" />
-                    const isLibero = slot.current === team.liberoOnCourt
-                    const dim =
-                      selectedBench !== null &&
-                      ineligibleReason(team, selectedBench, idx) !== null
-                    return (
-                      <button
-                        key={pos}
-                        className={[
-                          'cell',
-                          pos === 1 && serving ? 'server' : '',
-                          isLibero ? 'is-libero' : '',
-                          selectedSlot === idx ? 'selected' : '',
-                          dim ? 'dim' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                        disabled={dim}
-                        onClick={() => tapCourt(side, idx)}
-                      >
-                        <em>
-                          {slot.rn}
-                          {slot.liberoServeFlag && <s>▲</s>}
-                        </em>
-                        <b className="num">{slot.current}</b>
-                        {slot.history.length > 0 && (
-                          <i className="num">{slot.history.join(' ')}</i>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="serve-state">
-                {serving ? (
-                  <>
-                    <span className="dot" /> serving <b className="num">#{server.current}</b>
-                  </>
-                ) : (
-                  'receiving'
-                )}
-              </div>
-
-              {/* The full roster in fixed slots. A chip never moves during a match, so
-                  the operator reaches for a known spot rather than scanning. */}
-              <div className="bench">
-                {state.rosters[side].map((p) => {
-                  const isOn = onCourtNumbers.has(p.number)
-                  const dim =
-                    selectedSlot !== null &&
-                    ineligibleReason(team, p.number, selectedSlot) !== null
-                  const returnsTo = team.exitSlot[p.number]
-                  const libero = snap.liberoNumbers.includes(p.number)
-                  return (
-                    <button
-                      key={p.number}
-                      className={[
-                        'bchip',
-                        isOn ? 'on-court' : '',
-                        libero ? 'libero' : '',
-                        selectedBench === p.number ? 'selected' : '',
-                        dim ? 'dim' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      disabled={isOn || dim}
-                      onClick={() => tapBench(side, p.number)}
-                    >
-                      <span className="num">{p.number}</span>
-                      {returnsTo !== undefined && !isOn && (
-                        <em>{team.slots[returnsTo].rn}</em>
-                      )}
-                    </button>
-                  )
-                })}
-                <button className="bchip add" onClick={() => setAdding(side)} title="Add a player">
-                  +
-                </button>
-              </div>
-
-              <div className="subs" title={`${team.subsUsed.length} of ${MAX_SUBS} substitutions`}>
-                {Array.from({ length: MAX_SUBS }, (_, i) => (
-                  <span key={i} className={i < team.subsUsed.length ? 'used num' : 'num'}>
-                    {i + 1}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )
-        })}
-
-        <div className="divider">
-          <span className="eyebrow">set</span>
-          <b className="num">{state.currentSet}</b>
-          <span className="num sets-line">
-            {state.setsWon.home}–{state.setsWon.visitor}
-          </span>
-          <span className="num target">to {state.targetScore}</span>
-        </div>
-      </div>
-
-      {state.matchComplete && !events.some((e) => e.type === 'MATCH_ENDED') && (
-        <div className="set-end match-end">
-          <span>
-            {setup[state.setsWon.home > state.setsWon.visitor ? 'home' : 'visitor'].name} wins the
-            match{' '}
-            <b className="num">
-              {Math.max(state.setsWon.home, state.setsWon.visitor)}–
-              {Math.min(state.setsWon.home, state.setsWon.visitor)}
-            </b>
-          </span>
-          <button
-            className="btn primary"
-            onClick={() => {
-              append({ type: 'MATCH_ENDED', endTime: new Date().toTimeString().slice(0, 5) })
-              onCloseout()
-            }}
-          >
-            End match
-          </button>
-        </div>
-      )}
-
-      {state.setComplete && state.setInProgress && (
-        <div className="set-end">
-          <span>
-            {state.score.home > state.score.visitor ? setup.home.name : setup.visitor.name} wins{' '}
-            <b className="num">
-              {state.score.home}–{state.score.visitor}
-            </b>
-          </span>
-          <button
-            className="btn primary"
-            onClick={() =>
-              append({
-                type: 'SET_ENDED',
-                setNumber: state.currentSet,
-                endTime: new Date().toTimeString().slice(0, 5),
-              })
-            }
-          >
-            End set {state.currentSet}
-          </button>
-        </div>
-      )}
-
-      {/* Spatially mirrored: the operator never reads a label to know which team a
-          button belongs to. */}
-      <footer className="bar">
-        <div className="side left">
-          <button
-            className="btn"
-            disabled={state.teams.home.timeoutsUsed >= MAX_TIMEOUTS}
-            onClick={() => append({ type: 'TIMEOUT', team: 'home' })}
-          >
-            Time out
-          </button>
-          <button className="btn ghost" onClick={() => append({ type: 'REPLAY' })}>
-            Replay
-          </button>
-        </div>
-
-        <div className="side center">
-          <button className="btn" onClick={undoLast} disabled={!canUndo}>
-            Undo
-          </button>
-          <button className="btn" onClick={onSheet}>
-            Sheet
-          </button>
-          <div className="menu-wrap">
-            <button
-              className="btn ghost"
-              onClick={(e) => {
-                e.stopPropagation()
-                setMenu((m) => !m)
-              }}
-            >
-              ⋯
-            </button>
-            {menu && (
-              <ul className="menu" onClick={(e) => e.stopPropagation()}>
-                <li>
-                  <button
-                    onClick={() => {
-                      append({ type: 'RESERVE' })
-                      setMenu(false)
-                    }}
-                  >
-                    Re-serve
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      onAdjust()
-                      setMenu(false)
-                    }}
-                  >
-                    Fix lineup…
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      setAdding('home')
-                      setMenu(false)
-                    }}
-                  >
-                    Add player to {setup.home.name}
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      setAdding('visitor')
-                      setMenu(false)
-                    }}
-                  >
-                    Add player to {setup.visitor.name}
-                  </button>
-                </li>
-                <li>
-                  <button
-                    disabled={!state.setInProgress}
-                    onClick={() => {
-                      append({
-                        type: 'SET_ENDED',
-                        setNumber: state.currentSet,
-                        endTime: new Date().toTimeString().slice(0, 5),
-                      })
-                      setMenu(false)
-                    }}
-                  >
-                    End set manually
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      onEditSetup()
-                      setMenu(false)
-                    }}
-                  >
-                    Edit teams &amp; setup
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      onExport()
-                      setMenu(false)
-                    }}
-                  >
-                    Export match
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      onCloseout()
-                      setMenu(false)
-                    }}
-                  >
-                    Finish match…
-                  </button>
-                </li>
-              </ul>
+    const cells = GRID[side].map((pos) => {
+      const idx = t.slots.findIndex((s) => s.position === pos) as SlotIndex
+      const slot: Slot | undefined = t.slots[idx]
+      if (!slot) return <div key={pos} className="cell" />
+      const isServer = serving && pos === 1
+      const selected = selCell === idx
+      const active = selected || isServer
+      const bg = active
+        ? 'var(--cell-active-bg)'
+        : FRONT_ROW.includes(pos)
+          ? p.cellFront
+          : p.cellBack
+      const fg = active ? p.onActive : p.ink
+      const sub = active ? p.inkFaint : p.inkMuted
+      const blocked = selChip !== null && ineligibleReason(t, selChip, idx) !== null
+      return (
+        <button
+          key={pos}
+          className="cell"
+          style={{
+            background: bg,
+            ...(blocked ? { opacity: 0.28, cursor: 'default' } : null),
+          }}
+          disabled={blocked}
+          onClick={() => tapCell(side, idx)}
+        >
+          <div className="cell-top" style={{ color: sub }}>
+            {slot.rn}
+            {isLibero(slot.current) && <Triangle em="1em" color={sub} />}
+          </div>
+          <div className="cell-bottom">
+            <span className="cell-number" style={{ color: fg }}>
+              {slot.current}
+            </span>
+            {slot.history.length > 0 ? (
+              <span className="cell-history" style={{ color: sub }}>
+                {slot.history.join(' ')}
+              </span>
+            ) : (
+              <span />
             )}
           </div>
-        </div>
+        </button>
+      )
+    })
 
-        <div className="side right">
-          <button className="btn ghost" onClick={() => append({ type: 'REPLAY' })}>
-            Replay
-          </button>
-          <button
-            className="btn"
-            disabled={state.teams.visitor.timeoutsUsed >= MAX_TIMEOUTS}
-            onClick={() => append({ type: 'TIMEOUT', team: 'visitor' })}
-          >
-            Time out
-          </button>
-        </div>
-      </footer>
+    const chips = roster.map(({ number: j }) => {
+      const here = onCourtNumbers.has(j)
+      const selected = selChip === j
+      const eligible = selCell === null || ineligibleReason(t, j, selCell) === null
+      const state_ = here ? 'oncourt' : !eligible ? 'ineligible' : 'available'
+      let bg: string
+      let fg: string
+      let bd = 'transparent'
+      if (here) {
+        bg = 'transparent'
+        fg = p.inkMuted
+        bd = p.rule
+      } else if (selected) {
+        bg = 'var(--cell-active-bg)'
+        fg = p.onActive
+      } else {
+        bg = p.cellBack
+        fg = p.ink
+      }
+      const origin = t.exitSlot[j]
+      return (
+        <button
+          key={j}
+          className="chip"
+          data-state={state_}
+          style={{ background: bg, color: fg, borderColor: bd }}
+          disabled={here || !eligible}
+          onClick={() => tapChip(side, j)}
+        >
+          {isLibero(j) && <Triangle em="0.75em" color={fg} />}
+          {j}
+          {!here && origin !== undefined && (
+            <span className="chip-slot" style={{ color: selected ? p.inkFaint : p.inkMuted }}>
+              {t.slots[origin].rn}
+            </span>
+          )}
+        </button>
+      )
+    })
 
-      {adding && (
-        <div className="sheet-modal" onClick={() => setAdding(null)}>
-          <div className="card modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Add a player to {setup[adding].name}</h2>
-            <p className="faint">
-              Adding a player mid-match reflows the roster row. Prefer entering opponent
-              numbers during warmups.
-            </p>
-            <div className="add-player">
-              <input
-                className="num"
-                inputMode="numeric"
-                autoFocus
-                placeholder="#"
-                value={newNumber}
-                maxLength={3}
-                onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
-              />
-              <span />
+    const subs = Array.from({ length: MAX_SUBS }, (_, i) => {
+      const u = t.subsUsed[i]
+      return (
+        <span
+          key={i}
+          className="sub-n"
+          style={{ color: u ? (u.exceptional ? 'var(--flag-amber)' : p.ink) : p.rule }}
+        >
+          {i + 1}
+        </span>
+      )
+    })
+
+    return (
+      <section
+        className="panel"
+        data-side={side}
+        aria-label={side === 'home' ? 'Home team' : 'Visiting team'}
+        style={{ background: serving ? p.base : p.dim }}
+      >
+        <div className="panel-head">
+          <span className="panel-name" style={{ color: p.ink }}>
+            {snap.name}
+          </span>
+          <span className="panel-sets" style={{ color: p.inkMuted }}>
+            sets {state.setsWon[side]}
+          </span>
+        </div>
+        <div className="panel-body">
+          <button className="score-block" onClick={() => append({ type: 'RALLY_WON', team: side })}>
+            <span className="score-value" style={{ color: p.ink }}>
+              {state.score[side]}
+            </span>
+            {/* Third of three serve indications: panel tint, inverted cell, this line. */}
+            <span className="serve-line">
+              {serving ? (
+                <>
+                  <BallIcon color={p.ink} />
+                  <span style={{ color: p.ink }}>
+                    serving #{t.slots[servingSlotIndex(t)].current}
+                  </span>
+                </>
+              ) : (
+                <span style={{ color: p.inkMuted }}>receiving</span>
+              )}
+            </span>
+          </button>
+          <div className="court">{cells}</div>
+        </div>
+        <div className="roster">{chips}</div>
+        <div className="subs" style={{ borderTopColor: p.rule }}>
+          {subs}
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <div className="stage">
+      <div className="app">
+        <header className="rail">
+          <div className="rail-left">
+            <span className="rail-level">{setup.level === 'jv' ? 'JV' : setup.level}</span>
+            <span className="rail-sets">{setLine}</span>
+          </div>
+          <div className="rail-right">
+            <span className="rail-clock">{clock}</span>
+            <span className="rail-icon" title="Saved on this device" aria-label="Saved on this device">
+              {icons.save}
+            </span>
+            <span className="rail-icon" title="Offline" aria-label="Offline">
+              {icons.offline}
+            </span>
+            <button
+              className="btn"
+              style={{ padding: '0.9cqh 1.6cqh' }}
+              onClick={props.onToggleTheme}
+            >
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </button>
+          </div>
+        </header>
+
+        <main className="court-area">
+          {renderPanel('home')}
+          <div className="divider">
+            <span className="divider-label">Set</span>
+            <span className="divider-set">{state.currentSet}</span>
+            <span className="divider-rule" />
+            <span className="divider-match">
+              {state.setsWon.home}&ndash;{state.setsWon.visitor}
+            </span>
+          </div>
+          {renderPanel('visitor')}
+        </main>
+
+        <footer className="bar">
+          <div className="bar-group">
+            <button
+              className="btn"
+              data-team="home"
+              style={{ '--team-rule': palettes.home.rule } as React.CSSProperties}
+              disabled={state.teams.home.timeoutsUsed >= MAX_TIMEOUTS}
+              onClick={() => append({ type: 'TIMEOUT', team: 'home' })}
+            >
+              {icons.timeout}
+              time out
+            </button>
+            <button
+              className="btn"
+              data-team="home"
+              style={{ '--team-rule': palettes.home.rule } as React.CSSProperties}
+              onClick={() => append({ type: 'REPLAY' })}
+            >
+              {icons.replay}
+              replay
+            </button>
+          </div>
+          <div className="bar-group centre">
+            <button className="btn" onClick={undoLast} disabled={!canUndo}>
+              {icons.undo}
+              undo
+            </button>
+            <button className="btn" onClick={props.onSheet}>
+              {icons.sheet}
+              sheet
+            </button>
+            <button
+              className="btn"
+              aria-label="More"
+              onClick={() => setPanel((v) => (v === 'menu' ? 'none' : 'menu'))}
+            >
+              {icons.more}
+            </button>
+          </div>
+          <div className="bar-group right">
+            <button
+              className="btn"
+              data-team="visitor"
+              style={{ '--team-rule': palettes.visitor.rule } as React.CSSProperties}
+              onClick={() => append({ type: 'REPLAY' })}
+            >
+              {icons.replay}
+              replay
+            </button>
+            <button
+              className="btn"
+              data-team="visitor"
+              style={{ '--team-rule': palettes.visitor.rule } as React.CSSProperties}
+              disabled={state.teams.visitor.timeoutsUsed >= MAX_TIMEOUTS}
+              onClick={() => append({ type: 'TIMEOUT', team: 'visitor' })}
+            >
+              {icons.timeout}
+              time out
+            </button>
+          </div>
+        </footer>
+
+        <div
+          className="hint"
+          hidden={
+            panel === 'none' &&
+            state.warnings.length === 0 &&
+            !(state.setComplete && state.setInProgress) &&
+            !(state.matchComplete && !matchEnded)
+          }
+        >
+          {state.warnings.slice(-2).map((w) => (
+            <div className="hint-row hint-warn" key={w}>
+              {w}
+            </div>
+          ))}
+
+          {state.matchComplete && !matchEnded && (
+            <div className="hint-row">
+              <span>
+                {setup[matchWinner].name} wins the match {Math.max(state.setsWon.home, state.setsWon.visitor)}
+                &ndash;{Math.min(state.setsWon.home, state.setsWon.visitor)}
+              </span>
+              <span className="spacer" />
               <button
-                className="btn primary"
-                disabled={
-                  !newNumber.trim() ||
-                  state.rosters[adding].some((p) => p.number === newNumber.trim())
-                }
+                className="btn"
                 onClick={() => {
-                  append({
-                    type: 'ROSTER_ADD',
-                    team: adding,
-                    number: newNumber.trim(),
-                    name: null,
-                  })
-                  setNewNumber('')
-                  setAdding(null)
+                  append({ type: 'MATCH_ENDED', endTime: endTime() })
+                  props.onCloseout()
                 }}
               >
-                Add
+                End match
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {state.warnings.length > 0 && (
-        <ul className="warnings">
-          {state.warnings.slice(-2).map((w) => (
-            <li key={w}>
-              <b>⚠</b> {w}
-            </li>
-          ))}
-        </ul>
-      )}
+          {state.setComplete && state.setInProgress && (
+            <div className="hint-row">
+              <span>
+                {state.score.home > state.score.visitor ? setup.home.name : setup.visitor.name} wins{' '}
+                {state.score.home}&ndash;{state.score.visitor}
+              </span>
+              <span className="spacer" />
+              <button
+                className="btn"
+                onClick={() =>
+                  append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
+                }
+              >
+                End set {state.currentSet}
+              </button>
+            </div>
+          )}
+
+          {panel === 'menu' && (
+            <div className="hint-row hint-actions">
+              <button className="btn" onClick={() => { props.onAdjust(); setPanel('none') }}>
+                Fix lineup
+              </button>
+              <button className="btn" onClick={() => { setAdding('home'); setPanel('none') }}>
+                Add player to {setup.home.name}
+              </button>
+              <button className="btn" onClick={() => { setAdding('visitor'); setPanel('none') }}>
+                Add player to {setup.visitor.name}
+              </button>
+              <button className="btn" onClick={() => { append({ type: 'RESERVE' }); setPanel('none') }}>
+                Re-serve
+              </button>
+              <button className="btn" onClick={() => { props.onEditSetup(); setPanel('none') }}>
+                Edit teams
+              </button>
+              <button className="btn" onClick={() => { props.onExport(); setPanel('none') }}>
+                Export
+              </button>
+              <button className="btn" onClick={() => { props.onCloseout(); setPanel('none') }}>
+                Finish match
+              </button>
+              <button className="btn" onClick={() => { props.onHome(); setPanel('none') }}>
+                Matches
+              </button>
+              <button className="btn" onClick={() => setPanel('hint')}>
+                How this works
+              </button>
+            </div>
+          )}
+
+          {panel === 'hint' && <div className="hint-row hint-text">{HINT}</div>}
+        </div>
+
+        {adding && (
+          <div className="sheet-scrim" onClick={() => setAdding(null)}>
+            <div className="sheet" onClick={(e) => e.stopPropagation()}>
+              <span className="sheet-title">Add a player to {setup[adding].name}</span>
+              <span className="sheet-note">
+                Adding a player mid-match reflows the roster row. Prefer entering opponent
+                numbers during warmups.
+              </span>
+              <div className="sheet-row">
+                <input
+                  inputMode="numeric"
+                  autoFocus
+                  placeholder="Number"
+                  value={newNumber}
+                  maxLength={3}
+                  onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
+                />
+                <button className="btn" onClick={() => setAdding(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="btn"
+                  disabled={
+                    !newNumber.trim() ||
+                    state.rosters[adding].some((p) => p.number === newNumber.trim())
+                  }
+                  onClick={() => {
+                    append({ type: 'ROSTER_ADD', team: adding, number: newNumber.trim(), name: null })
+                    setNewNumber('')
+                    setAdding(null)
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
