@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 
+import { lineupProblemSlots, lineupProblems } from '../model/lineup'
 import { ROMAN, type EventBody, type MatchSetup, type TeamSide } from '../model/types'
 
 /**
@@ -34,6 +35,8 @@ function LineupEditor({
   liberos,
   onAssign,
   onToggleLibero,
+  problemSlots,
+  showProblems,
 }: {
   side: TeamSide
   setup: MatchSetup
@@ -41,6 +44,8 @@ function LineupEditor({
   liberos: string[]
   onAssign: (slot: number, player: string | null) => void
   onToggleLibero: (player: string) => void
+  problemSlots: Set<number>
+  showProblems: boolean
 }) {
   const [selected, setSelected] = useState<number | null>(null)
   const team = setup[side]
@@ -51,10 +56,9 @@ function LineupEditor({
 
   function tapPlayer(number: string) {
     if (selected === null) return
-    // Assigning a player who is already in another slot moves her rather than
-    // duplicating her, so a mis-tap is one tap to fix, not two.
-    const existing = lineup.indexOf(number)
-    if (existing >= 0 && existing !== selected) onAssign(existing, null)
+    // One call, because the parent owns the draft: clearing the old slot and filling
+    // the new one as two updates would both derive from the same stale draft, the
+    // clear would be lost, and the player would end up in two slots at once.
     onAssign(selected, number)
     const next = lineup.findIndex((v, i) => i > selected && v === null)
     setSelected(next >= 0 ? next : null)
@@ -71,7 +75,14 @@ function LineupEditor({
         {ROMAN.map((rn, i) => (
           <button
             key={rn}
-            className={`slot${selected === i ? ' selected' : ''}${lineup[i] ? ' filled' : ''}`}
+            className={[
+              'slot',
+              lineup[i] ? 'filled' : '',
+              selected === i ? 'selected' : '',
+              showProblems && problemSlots.has(i) ? 'problem' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
             onClick={() => setSelected(selected === i ? null : i)}
           >
             <em>{rn}</em>
@@ -128,17 +139,28 @@ export default function SetSetupScreen({
   onCloseout,
   onStart,
 }: Props) {
+  const [showProblems, setShowProblems] = useState(false)
   const { lineups, liberos, firstServe, targetScore, sidesSwitched } = draft
   const patch = (p: Partial<SetDraft>) => onDraftChange({ ...draft, ...p })
 
-  const complete = useMemo(
-    () =>
-      (['home', 'visitor'] as TeamSide[]).every((side) => {
-        const l = lineups[side]
-        return l.every(Boolean) && new Set(l).size === 6
-      }),
+  const problemSlots = useMemo(
+    () => ({
+      home: lineupProblemSlots(lineups.home),
+      visitor: lineupProblemSlots(lineups.visitor),
+    }),
     [lineups],
   )
+
+  /** What is stopping the set from starting, in words. */
+  const problems = useMemo(
+    () =>
+      (['home', 'visitor'] as TeamSide[]).flatMap((side) =>
+        lineupProblems(lineups[side], setup[side].name || side),
+      ),
+    [lineups, setup],
+  )
+
+  const complete = problems.length === 0
 
   // A decided match still offers another set, in case the result needs correcting,
   // but closing out is the primary action once it is.
@@ -147,6 +169,12 @@ export default function SetSetupScreen({
 
   function assign(side: TeamSide, slot: number, player: string | null) {
     const next = [...lineups[side]]
+    // Placing a player who already holds another slot moves her rather than
+    // duplicating her, so a mis-tap is one tap to fix.
+    if (player !== null) {
+      const existing = next.indexOf(player)
+      if (existing >= 0 && existing !== slot) next[existing] = null
+    }
     next[slot] = player
     patch({ lineups: { ...lineups, [side]: next } })
   }
@@ -166,6 +194,7 @@ export default function SetSetupScreen({
   }
 
   function start() {
+    setShowProblems(false)
     onStart({
       type: 'SET_STARTED',
       setNumber: draft.setNumber,
@@ -207,10 +236,11 @@ export default function SetSetupScreen({
             Finish match
           </button>
         )}
+        {/* Always clickable: a dead button cannot say what is wrong with the lineup. */}
         <button
           className={matchDecided ? 'btn lg' : 'btn primary lg'}
-          onClick={start}
-          disabled={!complete}
+          onClick={() => (complete ? start() : setShowProblems(true))}
+          aria-disabled={!complete}
         >
           Start set
         </button>
@@ -262,6 +292,17 @@ export default function SetSetupScreen({
         </div>
       </div>
 
+      {showProblems && !complete && (
+        <div className="card problems" role="alert">
+          <b>The set cannot start yet</b>
+          <ul>
+            {problems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <p className="faint requirement">
         Lineups are entered by serve order, not court position. Slot I serves first.
       </p>
@@ -276,6 +317,8 @@ export default function SetSetupScreen({
             liberos={liberos[side]}
             onAssign={(slot, player) => assign(side, slot, player)}
             onToggleLibero={(player) => toggleLibero(side, player)}
+            problemSlots={problemSlots[side]}
+            showProblems={showProblems}
           />
         ))}
       </div>

@@ -601,3 +601,12 @@ button {
 .install-copy p { margin: 0; font-size: 0.85rem; max-width: 62ch; }
 .install-copy b { color: var(--fg); font-weight: 650; }
 .install-actions { display: flex; gap: 0.4rem; }
+
+/* --- Set setup validation ------------------------------------------------ */
+
+.problems { border-color: var(--warn); display: grid; gap: 0.4rem; }
+.problems b { font-size: 0.9rem; font-weight: 650; color: var(--warn); }
+.problems ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; font-size: 0.87rem; color: var(--fg-dim); }
+
+.slot.problem { outline: 2px solid var(--warn); outline-offset: -2px; }
+.btn[aria-disabled='true'] { opacity: 0.45; }

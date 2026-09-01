@@ -20,6 +20,7 @@ Do not introduce mutable current-state storage as an optimization.
 | `src/model/types.ts` | Event schema and derived state shapes |
 | `src/model/reducer.ts` | The fold, rotation, and sheet-mark rules |
 | `src/model/selection.ts` | What a substitution gesture means, and what is eligible |
+| `src/model/lineup.ts` | Why a lineup is not ready to start, in words |
 | `src/state/store.ts` | Ownership of the log; the only place it is written |
 | `src/db/db.ts` | Dexie stores, export, import, migration |
 | `src/db/db.test.ts` | Storage tests, including the version 1 to 2 upgrade path |
@@ -44,7 +45,7 @@ npm run dev
 npm test
 ```
 
-49 tests. The reducer and selection model are pure and tested directly; the storage
+54 tests. The reducer and selection model are pure and tested directly; the storage
 layer runs against `fake-indexeddb`, including the version 1 to version 2 upgrade,
 which is a real regression test — reintroducing the primary key change fails it with
 Dexie's `UpgradeError`.

@@ -79,6 +79,15 @@ Runs before every set, including set 1.
 - **Libero designation** per team for this set. May differ per set.
 - **Teams switched sides** toggle, default off.
 
+**Start set** is never disabled. A dead button cannot say what is wrong, and the
+operator is standing at the scorer's table wondering why nothing happens. Pressing it
+with an incomplete lineup names every problem in words — which slots are empty, and
+which player is in two slots at once — and outlines the offending slots. The list
+updates as each problem is fixed and disappears when the set can start.
+
+Placing a player who already holds another slot **moves** her rather than duplicating
+her, so a mis-tap is one tap to fix.
+
 Emits `SET_STARTED`.
 
 ---
