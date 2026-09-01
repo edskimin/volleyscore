@@ -155,7 +155,9 @@ export function exportFilename(setup: MatchSetup): string {
  * Standalone-PWA share sheet behavior on iOS has been inconsistent across versions,
  * so both paths exist. Web Share is preferred; the blob link always works.
  */
-export async function shareExport(record: MatchRecord): Promise<'shared' | 'downloaded'> {
+export type ExportResult = 'shared' | 'downloaded' | 'cancelled'
+
+export async function shareExport(record: MatchRecord): Promise<ExportResult> {
   const payload = JSON.stringify(toExport(record), null, 2)
   const filename = exportFilename(record.setup)
   const file = new File([payload], filename, { type: 'application/json' })
@@ -165,8 +167,13 @@ export async function shareExport(record: MatchRecord): Promise<'shared' | 'down
       await navigator.share({ files: [file], title: filename })
       return 'shared'
     } catch (err) {
-      // A user-cancelled share is not a failure worth escalating; fall through.
-      if ((err as Error).name !== 'AbortError') throw err
+      const name = (err as Error).name
+      // A deliberate cancel is not a failure, and must not quietly download instead.
+      if (name === 'AbortError') return 'cancelled'
+      // Anything else — NotAllowedError from a permissions policy, a share target that
+      // refuses the file, an unsupported context — falls through to the download.
+      // Having both paths is the whole point; escalating here would strand the match
+      // on the device with no way to write it out.
     }
   }
 
@@ -174,7 +181,10 @@ export async function shareExport(record: MatchRecord): Promise<'shared' | 'down
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  a.rel = 'noopener'
+  document.body.appendChild(a)
   a.click()
+  a.remove()
   URL.revokeObjectURL(url)
   return 'downloaded'
 }

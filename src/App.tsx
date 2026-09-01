@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { referencedNumbers } from './model/reducer'
 import { OTHER, type MatchSetup, type SetStarted, type TeamSide } from './model/types'
 import { useMatchStore } from './state/store'
+import Adjustment from './ui/Adjustment'
 import Closeout from './ui/Closeout'
 import Home from './ui/Home'
 import Scoresheet from './ui/Scoresheet'
@@ -18,6 +19,7 @@ type Route =
   | 'inMatch'
   | 'sheet'
   | 'closeout'
+  | 'adjustment'
 
 const EMPTY_LINEUP: (string | null)[] = [null, null, null, null, null, null]
 
@@ -186,6 +188,22 @@ export default function App() {
       )
     }
 
+    if (view === 'adjustment') {
+      return (
+        <div className="app">
+          <Adjustment
+            setup={record.setup}
+            state={state}
+            onCancel={() => setRoute('inMatch')}
+            onApply={(events) => {
+              store.append(...events)
+              setRoute('inMatch')
+            }}
+          />
+        </div>
+      )
+    }
+
     if (view === 'closeout') {
       return (
         <div className="app">
@@ -229,6 +247,7 @@ export default function App() {
             onSheet={() => setRoute('sheet')}
             onEditSetup={() => setRoute('editSetup')}
             onCloseout={() => setRoute('closeout')}
+            onAdjust={() => setRoute('adjustment')}
             onExport={() => void store.exportMatch()}
             onHome={() => setRoute('home')}
           />

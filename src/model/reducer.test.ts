@@ -398,3 +398,73 @@ describe('libero back row', () => {
     expect(s.warnings.some((w) => w.includes('front row'))).toBe(true)
   })
 })
+
+describe('adjustment', () => {
+  it('applies slot, serve and libero corrections as one event', () => {
+    const events: MatchEvent[] = [setStarted('home', { home: ['30'], visitor: [] })]
+    events.push(rally('home'), rally('home'))
+    events.push(
+      ev({
+        type: 'ADJUSTMENT',
+        team: 'home',
+        slotAssignments: { '3': '2' },
+        serveTeam: 'visitor',
+        serveSlot: 2,
+        liberoState: { onCourt: null, owes: {}, slotLock: {} },
+        countAgainstSubs: true,
+        note: '(2-0) fixed slot IV',
+      }),
+    )
+    const s = fold(setup(), events)
+    expect(s.teams.home.slots[3].current).toBe('2')
+    // The player who came off still owes the slot she left.
+    expect(s.teams.home.exitSlot['4']).toBe(3)
+    expect(s.serveTeam).toBe('visitor')
+    expect(servingSlotIndex(s.teams.visitor)).toBe(2)
+    expect(s.teams.home.subsUsed).toHaveLength(1)
+    expect(s.teams.home.comments).toContain('(2-0) fixed slot IV')
+  })
+
+  it('moves only the serve pointer when no team is named', () => {
+    const events: MatchEvent[] = [setStarted('home')]
+    events.push(
+      ev({
+        type: 'ADJUSTMENT',
+        team: null,
+        slotAssignments: null,
+        serveTeam: 'visitor',
+        serveSlot: 0,
+        liberoState: null,
+        countAgainstSubs: false,
+        note: '(0-0) first serve was recorded for the wrong team',
+      }),
+    )
+    const s = fold(setup(), events)
+    expect(s.serveTeam).toBe('visitor')
+    expect(servingSlotIndex(s.teams.visitor)).toBe(0)
+    expect(s.teams.home.slots.map((x) => x.current)).toEqual(HOME_LINEUP)
+  })
+
+  it('can put a libero back on court without counting a substitution', () => {
+    const events: MatchEvent[] = [setStarted('home', { home: ['30'], visitor: [] })]
+    events.push(
+      ev({
+        type: 'ADJUSTMENT',
+        team: 'home',
+        slotAssignments: { '4': '30' },
+        serveTeam: null,
+        serveSlot: null,
+        liberoState: { onCourt: '30', owes: { '30': '15' }, slotLock: {} },
+        countAgainstSubs: false,
+        note: '(0-0) missed libero replacement',
+      }),
+    )
+    const s = fold(setup(), events)
+    expect(s.teams.home.slots[4].current).toBe('30')
+    // Never recorded in the Player Number column.
+    expect(s.teams.home.slots[4].sheetPlayers).toEqual(['15'])
+    expect(s.teams.home.liberoOnCourt).toBe('30')
+    expect(s.teams.home.liberoOwes['30']).toBe('15')
+    expect(s.teams.home.subsUsed).toEqual([])
+  })
+})

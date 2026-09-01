@@ -52,6 +52,15 @@ a no-cache header on the service worker.
 npm run build
 ```
 
+## Export
+
+Two paths, because standalone-PWA share sheet behavior on iOS has been inconsistent
+across versions. Web Share is tried first; anything other than a deliberate cancel
+falls through to a blob download. A share that is refused by a permissions policy
+throws `NotAllowedError`, which must **not** be escalated — doing so strands the match
+on the device with no way to write it out, and the download path exists for exactly
+this case. A cancel returns `'cancelled'` and does not count as an export.
+
 ## Offline
 
 The app must work with no network connection. Gym wifi is unreliable and a rally must
@@ -69,8 +78,8 @@ renders an error screen rather than a blank page, but it is still fatal to scori
 
 ## Status
 
-Built: the reducer, the selection model, storage, and six of the seven screens —
-home, match setup, set setup, the in-match screen, the scoresheet, and closeout.
+Built: the reducer, the selection model, storage, and all seven screens — home, match
+setup, set setup, the in-match screen, the scoresheet, adjustment mode, and closeout.
 
 The scoresheet is laid out in points against the real OHSAA form, whose geometry was
 measured out of the PDF's vector rules and is recorded in `02-scoresheet-notation.md`.
@@ -86,10 +95,11 @@ any match that has never been exported.
 
 Not built yet:
 
-- Adjustment mode, so the overflow menu has no "Fix lineup" entry yet.
 - The prompt to install to the home screen (durability mitigation 2 in
   `01-data-model.md`). Mitigations 1 and 3, the blocking export and the per-set
   backup store, are both in place.
+- Automated tests for `src/db` and `src/state`. The reducer and selection model are
+  covered; the storage layer is not, which is how a fatal Dexie migration got through.
 
 One deliberate deviation from the spec: `SET_ENDED` is not emitted automatically when
 the win condition is met. A banner offers it instead, so a mis-tap on set point stays a

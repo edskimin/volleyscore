@@ -140,7 +140,8 @@ export function useMatchStore(): MatchStore {
 
   const exportMatch = useCallback(async () => {
     if (!record) return
-    await shareExport(record)
+    // Cancelling the share sheet is not an export, so it must not unblock completion.
+    if ((await shareExport(record)) === 'cancelled') return
     const exportedAt = await markExported(record.matchId)
     setRecord((prev) => (prev ? { ...prev, exportedAt } : prev))
   }, [record])

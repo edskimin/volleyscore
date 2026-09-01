@@ -261,6 +261,13 @@ Confirmation step requires:
 
 Emits one `ADJUSTMENT` event.
 
+Implementation note: `ADJUSTMENT` names a single `team`, so fixing both teams' lineups
+in one visit emits one event per changed team, at most two. The serve pointer is match
+level and rides on the first. Fixing only the serve emits a single event with
+`team: null`. Two events means two taps of undo, which is a mild deviation from
+"applied as a whole"; fixing one team, the ordinary case, is still one event and one
+undo.
+
 ---
 
 ## 7. Match closeout

@@ -24,6 +24,7 @@ interface Props {
   onSheet: () => void
   onEditSetup: () => void
   onCloseout: () => void
+  onAdjust: () => void
   onExport: () => void
   onHome: () => void
 }
@@ -56,6 +57,7 @@ export default function InMatch({
   onSheet,
   onEditSetup,
   onCloseout,
+  onAdjust,
   onExport,
   onHome,
 }: Props) {
@@ -338,6 +340,16 @@ export default function InMatch({
                     }}
                   >
                     Re-serve
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => {
+                      onAdjust()
+                      setMenu(false)
+                    }}
+                  >
+                    Fix lineup…
                   </button>
                 </li>
                 <li>

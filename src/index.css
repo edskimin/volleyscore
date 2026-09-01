@@ -572,3 +572,23 @@ button {
   overflow-x: auto;
 }
 .storage-error .btn { justify-self: start; }
+
+/* --- Adjustment mode ----------------------------------------------------- */
+
+.adjust .topbar h1 { color: var(--warn); }
+.adjust-intro { display: grid; gap: 0.6rem; border-color: var(--warn); }
+.adjust-intro p { margin: 0; font-size: 0.87rem; color: var(--fg-dim); }
+.adjust-intro ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; font-size: 0.87rem; color: var(--fg-dim); }
+.adjust-intro b { color: var(--fg); font-weight: 600; }
+.warn-line { color: var(--warn) !important; }
+
+.slot.changed { outline: 1px solid var(--warn); outline-offset: -1px; }
+.slot i { font-style: normal; font-size: 0.58rem; color: var(--warn); letter-spacing: 0.04em; }
+
+.serve-fix { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.confirm { display: grid; gap: 0.9rem; }
+.confirm .field input { width: 100%; }
+.faint.small { font-size: 0.78rem; margin: 0; }
+
+.check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; color: var(--fg-dim); }
+.check input { accent-color: var(--fg); }

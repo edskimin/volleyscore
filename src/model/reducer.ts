@@ -372,9 +372,16 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
           for (const [key, number] of Object.entries(ev.slotAssignments)) {
             const slot = team.slots[Number(key)]
             if (slot && slot.current !== number) {
-              slot.history.push(slot.current)
+              const displaced = slot.current
+              slot.history.push(displaced)
               slot.current = number
               if (!team.liberoDesignated.includes(number)) slot.sheetPlayers.push(number)
+              // The mode suspends constraints, but the player who came off still has a
+              // slot to return to, so later substitutions stay correctly bounded.
+              if (!team.liberoDesignated.includes(displaced)) {
+                team.exitSlot[displaced] = Number(key) as SlotIndex
+              }
+              delete team.exitSlot[number]
             }
           }
         }
