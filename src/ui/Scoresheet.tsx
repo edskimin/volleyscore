@@ -272,8 +272,14 @@ export default function Scoresheet({ setup, events, initialSet, onBack }: Props)
   }
 
   // Team names are written as the teams are positioned from the scorer's viewpoint,
-  // which is exactly what leftTeam records. A later SIDES_CHANGED corrects it for the
-  // set it happened in, so read the folded value rather than the SET_STARTED field.
+  // which is exactly what leftTeam records.
+  //
+  // Column order is ONE layout fact for the whole set, applied retroactively: a flip
+  // is a correction of the set's side assignment, not a change from that point on. On
+  // paper a scorer cannot re-letter a half-filled sheet, so a sheet whose columns
+  // swapped mid-set could never exist. foldThroughSet folds to the END of the set, so
+  // this is the last SIDES_CHANGED within it, or SET_STARTED.leftTeam if there is
+  // none, and every box is placed from this single value.
   const leftSide: TeamSide = state.leftTeam
   const rightSide: TeamSide = leftSide === 'home' ? 'visitor' : 'home'
 

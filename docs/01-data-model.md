@@ -192,6 +192,11 @@ The escape hatch. Suspends normal constraints so the operator can correct drift.
   slotAssignments: { "0": "12", "3": "2" } | null,   // slot index to jersey number
   serveTeam: "home" | "visitor" | null,              // move the serve pointer
   serveSlot: 2 | null,                               // move the serving slot
+  liberoState: {                                     // null = leave libero state alone
+    onCourt: string | null,
+    owes: { [liberoNumber]: playerNumber },
+    slotLock: { [liberoNumber]: slotIndex }
+  } | null,
   countAgainstSubs: boolean,
   note: string                                        // required, non-empty
 }
@@ -200,6 +205,23 @@ The escape hatch. Suspends normal constraints so the operator can correct drift.
 Applied as a whole. `note` must be non-empty; the UI prefills it with the score at
 the time. `countAgainstSubs` is asked once at confirmation, because the app cannot
 distinguish a genuine exceptional substitution from correcting a mis-tap.
+
+### `SIDES_CHANGED`
+
+```
+{ type: "SIDES_CHANGED", leftTeam: "home" | "visitor" }
+```
+
+Corrects which team the scorer sees on their left, mid-set. Side never enters the
+fold's arithmetic: events are keyed to team identity, so this is a recorded fact and a
+rendering change, and flipping corrupts nothing.
+
+**A flip corrects the whole set, not the rest of it.** The sheet renders a set's
+columns from the last `SIDES_CHANGED` within that set, or `SET_STARTED.leftTeam` if
+there is none. On paper a scorer cannot re-letter a half-filled sheet, so columns that
+swapped part-way through a set would render something that could never exist. This
+handles both reasons a flip happens, setting it wrong at set start and moving seats,
+and keeps column order a single layout fact per set.
 
 ### `SET_ENDED`
 
@@ -240,8 +262,9 @@ DerivedState {
 
 TeamState {
   slots: [ Slot x6 ],           // index 0 = slot I
-  serviceTurns: integer,        // count of turns this team has held serve this set
-  rotationPass: integer,        // floor(serviceTurns / 6). 0 = black, 1 = red, ...
+  serviceTurns: integer,        // service turns STARTED this set; the first-serving
+                                // team is initialized to 1 at SET_STARTED
+  rotationPass: integer,        // floor((serviceTurns - 1) / 6). 0 = black, 1 = red, ...
   timeoutsUsed: integer,        // max 2
   subsUsed: SubRecord[],        // max 18
   liberoOnCourt: string | null, // jersey number
@@ -249,6 +272,10 @@ TeamState {
   liberoOwes: { [liberoNumber]: playerNumber },   // who she must be replaced by
   running: { [pointNumber]: RunMark },
   sheetRows: [ SheetRow x6 ]
+}
+
+RunMark {
+  kind: "slash" | "circle" | "triangle"
 }
 
 Slot {
@@ -285,6 +312,17 @@ newPosition = ((position - 2 + 6) % 6) + 1
 
 The server is always the slot currently at court position 1.
 
+### Service turn counting
+
+`SET_STARTED` initializes `serviceTurns` to **1** for the first-serving team and **0**
+for the receiving team. Every subsequent turn is started by the `+= 1` in the side-out
+branch of rally resolution.
+
+`serviceTurns` therefore counts turns *started* this set, and is 1-based for both teams.
+This matters: the first-serving team never rotates into its opening turn, so if that
+turn is not counted its `rotationPass` and the receiving team's disagree, and the
+receiving team flips to red one turn before its slot I comes back up.
+
 ### Rally resolution
 
 ```
@@ -294,14 +332,17 @@ on RALLY_WON(w):
 
   if w == serveTeam:
       // serve point
-      append to serving slot's sheet row: { kind: "point", value: score[w] }
-      running[w][score[w]] = { kind: "slash" }
+      liberoServed = (w.liberoOnCourt is at court position 1)
+      append to serving slot's sheet row:
+        { kind: "point", value: score[w], circled: false, triangled: liberoServed }
+      running[w][score[w]] = { kind: liberoServed ? "triangle" : "slash" }
   else:
       // side-out
       append to loser's current serving slot's row: { kind: "endOfService" }
       rotate(w)
       w.serviceTurns += 1
-      append to w's new serving slot's row: { kind: "point", value: score[w], circled: true }
+      append to w's new serving slot's row:
+        { kind: "point", value: score[w], circled: true, triangled: false }
       running[w][score[w]] = { kind: "circle" }
       serveTeam = w
 
@@ -311,6 +352,29 @@ on RALLY_WON(w):
 
 Marks carry the color derived from the scoring team's `rotationPass` at the moment
 the mark is made.
+
+A side-out point is never triangled: the scoring team did not serve that rally, so
+`circled` and `triangled` are mutually exclusive.
+
+### Box-consuming events
+
+`RALLY_WON` is not the only event that writes to `sheetRows`. Per `02-scoresheet-notation.md`,
+each box is one play or action in chronological order in the row of the player
+**currently serving**. So the following also append a mark to the current serving
+slot's sheet row, on the serving team's side, regardless of which team acted:
+
+| Event | Mark | Notes |
+|---|---|---|
+| `SUBSTITUTION` | `S` if by the serving team, `SX` if by the receiving team | Carries `in/out` numbers, e.g. `SX 25/23` |
+| `TIMEOUT` | `T` if by the serving team, `TX` if by the receiving team | Also fills the calling team's time-out box |
+| `REPLAY` | `R` | No score effect |
+| `RESERVE` | `RS` | No score effect |
+
+`LIBERO_REPLACE` consumes no box. It is not a substitution and is not recorded on the
+sheet except through the libero triangles.
+
+These marks take the color of the **serving** team's current `rotationPass`, since
+they live in the serving team's strip.
 
 ### Set win condition
 
@@ -430,3 +494,14 @@ Mitigations, in order of importance:
    has been shared. This is the real protection.
 2. Prompt to install to the home screen.
 3. Write a backup copy to a second object store after each set.
+
+All three are implemented. Two notes from doing so:
+
+- **Never change a store's primary key in a Dexie upgrade.** Dexie throws
+  `UpgradeError`, the database never opens, and every screen goes blank on any device
+  that already ran the previous version. Adding an index is safe. If a key genuinely
+  has to change, create a new store and drop the old one.
+- **The export must not escalate a failed share.** `navigator.share` throws
+  `NotAllowedError` when a permissions policy refuses it; that has to fall through to
+  the blob download, or the match is stranded on the device. Only a deliberate cancel
+  should stop an export, and it must not count as one.

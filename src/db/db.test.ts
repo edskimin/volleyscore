@@ -1,5 +1,7 @@
 import 'fake-indexeddb/auto'
 
+import { readFileSync } from 'node:fs'
+
 import Dexie from 'dexie'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -297,5 +299,65 @@ describe('stored matches migrate too', () => {
     expect('sidesSwitched' in started).toBe(false)
     expect(stored?.schemaVersion).toBe(mod.SCHEMA_VERSION)
     mod.db.close()
+  })
+})
+
+describe('a new required field needs both migration paths', () => {
+  /**
+   * The gap that bit: imported files migrated and records already in IndexedDB did
+   * not, so the bug only existed on data that already existed. No fresh-state test
+   * can reach that. This asserts the two paths agree, so adding one without the
+   * other fails here rather than on a device mid-season.
+   */
+  const legacyEvents = [
+    { seq: 1, ts: 'x', type: 'SET_STARTED', setNumber: 1, sidesSwitched: false },
+    { seq: 2, ts: 'x', type: 'SET_STARTED', setNumber: 2, sidesSwitched: true },
+    { seq: 3, ts: 'x', type: 'RALLY_WON', team: 'home' },
+  ]
+
+  it('gives the same result whether a legacy match is imported or already stored', async () => {
+    const legacy = new Dexie('volleyscore')
+    legacy.version(1).stores({
+      matches: 'matchId, updatedAt, status',
+      teams: 'teamId, name, lastUsedAt',
+      appState: 'key',
+      backups: '++id, matchId, savedAt',
+    })
+    await legacy.open()
+    await legacy.table('matches').put({
+      schemaVersion: 1,
+      matchId: 'stored',
+      createdAt: 'x',
+      updatedAt: 'x',
+      status: 'in_progress',
+      setup: setup(),
+      events: legacyEvents,
+    })
+    legacy.close()
+
+    const mod = await load()
+    await mod.db.open()
+
+    const viaStore = await mod.db.matches.get('stored')
+    const viaImport = mod.migrate({
+      schemaVersion: 1,
+      matchId: 'imported',
+      exportedAt: 'x',
+      setup: setup(),
+      events: legacyEvents,
+    } as never)
+
+    expect(viaStore?.events).toEqual(viaImport.events)
+    expect(viaStore?.schemaVersion).toBe(viaImport.schemaVersion)
+    expect(viaStore?.schemaVersion).toBe(mod.SCHEMA_VERSION)
+    mod.db.close()
+  })
+
+  it('routes stored records through the same function the import path uses', () => {
+    // A schema bump that adds an import migration and forgets the Dexie upgrade is
+    // exactly the shape of the bug, so the wiring itself is asserted.
+    const src = readFileSync('src/db/db.ts', 'utf8')
+    expect(src).toMatch(/db\.version\(\d+\)\s*\n?\s*\.upgrade\(/)
+    expect(src).toMatch(/migrateEvents\(m\.events/)
   })
 })

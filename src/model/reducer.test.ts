@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { fold, initialPosition, rotatedPosition, servingSlotIndex, undo } from './reducer'
+import {
+  fold,
+  foldThroughSet,
+  initialPosition,
+  rotatedPosition,
+  servingSlotIndex,
+  undo,
+} from './reducer'
 import type { CourtPosition, MatchEvent, MatchSetup, SlotIndex, TeamSide } from './types'
 
 // --- Fixtures --------------------------------------------------------------
@@ -742,5 +749,64 @@ describe('side is a rendering fact, never an input to the fold', () => {
     const events = [...playedMatch('home'), ev({ type: 'SIDES_CHANGED', leftTeam: 'visitor' })]
     expect(fold(setup(), events).leftTeam).toBe('visitor')
     expect(fold(setup(), undo(events)).leftTeam).toBe('home')
+  })
+})
+
+describe('a flip corrects the whole set, not the rest of it', () => {
+  /** A set with marks either side of a mid-set flip, then ended. */
+  function setWithFlip(withFlip: boolean): MatchEvent[] {
+    seq = 0
+    const e: MatchEvent[] = [
+      ev({
+        type: 'SET_STARTED',
+        setNumber: 1,
+        targetScore: 25,
+        firstServe: 'home',
+        leftTeam: 'home',
+        lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
+        liberoDesignated: { home: [], visitor: [] },
+        startTime: '18:00',
+      }),
+    ]
+    for (let i = 0; i < 7; i++) e.push(rally(i % 2 === 0 ? 'home' : 'visitor'))
+    if (withFlip) e.push(ev({ type: 'SIDES_CHANGED', leftTeam: 'visitor' }))
+    for (let i = 0; i < 7; i++) e.push(rally(i % 3 === 0 ? 'visitor' : 'home'))
+    e.push(ev({ type: 'SET_ENDED', setNumber: 1, endTime: '18:40' }))
+    return e
+  }
+
+  it('applies a mid-set flip to the whole set, so columns never split', () => {
+    const flipped = foldThroughSet(setup(), setWithFlip(true), 1)!
+    // One value for the set, taken at its end: the last SIDES_CHANGED within it.
+    // The sheet places every box from this, so a box from before the flip cannot
+    // land in a different column from one after it.
+    expect(flipped.leftTeam).toBe('visitor')
+
+    const plain = foldThroughSet(setup(), setWithFlip(false), 1)!
+    expect(plain.leftTeam).toBe('home')
+
+    // And no box moved: the marks themselves are keyed to team identity.
+    for (const side of ['home', 'visitor'] as TeamSide[]) {
+      expect(flipped.teams[side].sheetRows).toEqual(plain.teams[side].sheetRows)
+      expect(flipped.teams[side].running).toEqual(plain.teams[side].running)
+    }
+  })
+
+  it('does not leak a flip into the next set, which states its own side', () => {
+    const events = setWithFlip(true)
+    events.push(
+      ev({
+        type: 'SET_STARTED',
+        setNumber: 2,
+        targetScore: 25,
+        firstServe: 'visitor',
+        leftTeam: 'home',
+        lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
+        liberoDesignated: { home: [], visitor: [] },
+        startTime: '18:45',
+      }),
+    )
+    expect(foldThroughSet(setup(), events, 1)!.leftTeam).toBe('visitor')
+    expect(foldThroughSet(setup(), events, 2)!.leftTeam).toBe('home')
   })
 })
