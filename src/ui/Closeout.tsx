@@ -139,11 +139,9 @@ export default function Closeout({
       {error && <p className="import-error">{error}</p>}
 
       <section className="card">
+        {/* The heading says what the buttons do. Explaining that a saved team is a
+            copy is a consequence the operator cannot act on here. */}
         <h2 className="section-title">Save teams for next time</h2>
-        <p className="muted small">
-          A convenience copy of the roster and colors. Editing a saved team later never
-          changes a match already recorded.
-        </p>
         <div className="save-teams">
           {(['home', 'visitor'] as TeamSide[]).map((side) => (
             <button

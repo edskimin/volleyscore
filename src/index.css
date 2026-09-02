@@ -329,7 +329,6 @@ button {
 .closeout { max-width: 780px; margin: 0 auto; width: 100%; }
 .closeout h1 { font-size: 1.05rem; }
 .section-title { margin: 0 0 0.2rem; font-size: 0.95rem; font-weight: 600; }
-.muted.small { font-size: 0.82rem; margin: 0 0 0.7rem; }
 
 .result { display: grid; gap: 0.9rem; }
 .result-head { display: flex; align-items: baseline; gap: 0.5rem; font-size: 1.15rem; }

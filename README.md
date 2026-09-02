@@ -59,6 +59,11 @@ amber status line in the rail plus one primary control, with the court live and 
 reachable throughout. Nothing self-opens, scrims, or blocks. A prompt at set point that
 sits in front of undo blocks it at the moment a mis-tap is most likely and most costly.
 
+**A rule warning is a mark, not a message, and the mark has to be loud.** A hairline
+outline reads as decoration and gets missed. Every warning has a two-level find path:
+an amber dot beside the team name says which panel to look at, and a 3px amber outline
+plus an amber dot on the cell says which object is wrong.
+
 **A rule warning is a mark, not a message.** The warnings this app raises are states,
 not events, so `computeWarnings()` derives them from the final folded state rather than
 accumulating them as the log is folded, and each names the object it marks. An exhausted
@@ -94,8 +99,13 @@ npm test
 
 `scripts/probe.js` holds two browser probes for the in-match screen: `layoutProbe()`
 asserts no overlay displaces the court, and `colorProbe()` asserts nothing renders a
-color outside the chrome tokens, the derived team shades and `--flag-amber`. Both exist
-because a defect got past a screenshot.
+color outside the chrome tokens, the derived team shades and `--flag-amber`, and that
+every warning mark is amber and thick enough to find. Both exist because a defect got
+past a screenshot.
+
+**Never explain a consequence the operator cannot act on right now,** and never give
+advice at the moment someone is doing the thing the advice discourages. Cut the
+sentence rather than softening it.
 
 75 tests. The reducer and selection model are pure and tested directly; the storage
 layer runs against `fake-indexeddb`, including the version 1 to version 2 upgrade,

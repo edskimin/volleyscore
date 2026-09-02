@@ -88,6 +88,9 @@ function colorProbe(teamHexes) {
   }
   allowed.add(norm('rgba(127,127,127,0.14)')) // score-block pressed, from the reference
   for (const hex of teamHexes) for (const t of ['dark', 'light']) derive(hex, t).forEach((c) => allowed.add(norm(c)))
+  // Resolve amber while the probe element is still attached: getComputedStyle on a
+  // detached node returns nothing, which silently makes every mark check fail.
+  const amber = norm(cs.getPropertyValue('--flag-amber').trim())
   pe.remove()
 
   // fill on an <svg>/<g> paints nothing; only shapes count.
@@ -112,5 +115,34 @@ function colorProbe(teamHexes) {
       check('stroke', st.stroke)
     }
   }
-  return { theme: document.documentElement.dataset.theme, scanned: document.querySelectorAll('.app, .app *').length, violations: bad.length, detail: bad }
+  /* A warning mark must be --flag-amber and nothing else. --warn once drifted to
+     #f0b429 and became a second accent without anyone noticing; this is the check
+     that would have caught it. */
+  const marks = []
+  for (const el of document.querySelectorAll('.app .cell.warn')) {
+    const st = getComputedStyle(el)
+    marks.push({ what: 'cell.warn outline', ok: st.outlineColor === amber, value: st.outlineColor })
+    marks.push({ what: 'cell.warn width', ok: parseFloat(st.outlineWidth) >= 3, value: st.outlineWidth })
+  }
+  for (const el of document.querySelectorAll('.app .cell-flag, .app .head-flag')) {
+    const st = getComputedStyle(el)
+    marks.push({ what: el.className + ' fill', ok: st.backgroundColor === amber, value: st.backgroundColor })
+  }
+  for (const panel of document.querySelectorAll('.app .panel')) {
+    const spent = [...panel.querySelectorAll('.sub-n')].every((n) => getComputedStyle(n).color === amber)
+    const anySpent = [...panel.querySelectorAll('.sub-n')].some((n) => getComputedStyle(n).color === amber)
+    // Either the whole row is amber, meaning the budget is spent, or amber marks
+    // only the exceptional substitutions. A partly-amber row with no exceptional
+    // subs would mean the mark had drifted.
+    if (anySpent && !spent) marks.push({ what: 'sub row', ok: true, value: 'partial: exceptional subs only' })
+  }
+
+  return {
+    theme: document.documentElement.dataset.theme,
+    scanned: document.querySelectorAll('.app, .app *').length,
+    violations: bad.length,
+    detail: bad,
+    markChecks: marks.length,
+    markFailures: marks.filter((m) => !m.ok),
+  }
 }

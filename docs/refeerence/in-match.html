@@ -253,8 +253,24 @@ body {
   transition: background-color 120ms ease, opacity 120ms ease;
 }
 /* A warning is a persistent mark on the thing that is wrong, never a
-   message. It stays until the condition clears. */
-.cell.warn { outline: 1.5px solid var(--flag-amber); outline-offset: -1.5px; }
+   message. It stays until the condition clears. It has to be loud enough to
+   be FOUND without hunting: a hairline outline reads as decoration. */
+.cell.warn { outline: 3px solid var(--flag-amber); outline-offset: -3px; }
+.cell-flag {
+  width: 1.4cqh; height: 1.4cqh;
+  border-radius: 50%;
+  background: var(--flag-amber);
+  flex: 0 0 auto;
+}
+/* Second level of the find path: the panel says which team to look at. */
+.head-flag {
+  width: 1.3cqh; height: 1.3cqh;
+  border-radius: 50%;
+  background: var(--flag-amber);
+  display: inline-block;
+  margin-left: 0.8cqh;
+  vertical-align: middle;
+}
 .cell-top    { display: flex; align-items: center; gap: 0.5cqh; font-size: var(--type-cell-label); }
 .cell-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6cqh; }
 .cell-number { font-size: var(--type-cell); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -570,6 +586,12 @@ var S = {
   })
 };
 S.home.slots[3].history = ["4","2","4"];   /* 4 out, 2 in, 4 back, 2 in again */
+/* Visitor slot III holds libero #24. Seeded at court position 4, the front row,
+   to demonstrate the warning mark. This is an illegal state on purpose. */
+S.visitor.slots[2].current = "24";
+S.visitor.liberoOnCourt = "24";
+S.visitor.liberoOwes["24"] = "8";
+S.visitor.slotOrigin["8"] = 2;
 
 /* Initial court positions.
    Serving team: slot N sits at court position N.
@@ -633,12 +655,26 @@ function warnings() {
   var out = [];
   ["home","visitor"].forEach(function(side) {
     var t = S[side];
-    if (t.subsUsed.length >= 18) out.push({ side: side, target: "subs", text: t.name + " has used all 18 substitutions" });
+    if (t.subsUsed.length >= 18) {
+      out.push({ side: side, target: "subs", text: t.name + " has used all 18 substitutions" });
+    }
     t.slots.forEach(function(sl) {
-      if (sl.warn) out.push({ side: side, target: "slot", slot: sl, text: sl.warn });
+      /* A libero cannot be in the front row. If she is, a libero replacement
+         was missed: the state is wrong, not the operator's last tap. */
+      if (isLibero(t, sl.current) && !backRow(sl.position)) {
+        out.push({ side: side, target: "slot", slot: sl,
+          text: t.name + " libero #" + sl.current + " is in the front row at slot " + sl.rn +
+                ". A libero replacement was probably missed." });
+      }
     });
   });
   return out;
+}
+function slotWarned(slot) {
+  return warnings().some(function(w) { return w.target === "slot" && w.slot === slot; });
+}
+function sideWarned(side) {
+  return warnings().some(function(w) { return w.side === side; });
 }
 
 /* =================================================================
@@ -677,13 +713,14 @@ function renderPanel(side) {
     var fg  = active ? p.onActive : p.ink;
     var sub = active ? p.inkFaint : p.inkMuted;
     var dim = cellAllowed(t, slot) ? "" : "opacity:.28;cursor:default;";
-    var warn = slot.warn ? " warn" : "";
+    var warn = slotWarned(slot) ? " warn" : "";
+    var flag = warn ? '<span class="cell-flag"></span>' : "";
     var lib = isLibero(t, slot.current) ? triangle("1em", sub) : "";
     var hist = slot.history.length
       ? '<span class="cell-history" style="color:' + sub + '">' + slot.history.join(" ") + "</span>"
       : "<span></span>";
     return '<div class="cell' + warn + '" data-side="' + side + '" data-pos="' + pos + '" style="background:' + bg + ";" + dim + '">' +
-             '<div class="cell-top" style="color:' + sub + '">' + slot.rn + lib + "</div>" +
+             '<div class="cell-top" style="color:' + sub + '">' + slot.rn + lib + flag + "</div>" +
              '<div class="cell-bottom"><span class="cell-number" style="color:' + fg + '">' + slot.current + "</span>" + hist + "</div>" +
            "</div>";
   }).join("");
@@ -722,7 +759,8 @@ function renderPanel(side) {
 
   el.innerHTML =
     '<div class="panel-head">' +
-      '<span class="panel-name" style="color:' + p.ink + '">' + t.name + "</span>" +
+      '<span class="panel-name" style="color:' + p.ink + '">' + t.name +
+        (sideWarned(side) ? '<span class="head-flag"></span>' : "") + "</span>" +
       '<span class="panel-sets" style="color:' + p.inkMuted + '">sets ' + t.sets + "</span>" +
     "</div>" +
     '<div class="panel-body">' +

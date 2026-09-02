@@ -440,38 +440,38 @@ export function computeWarnings(state: DerivedState, setup: MatchSetup): Warning
       })
     }
 
-    const libero = team.liberoOnCourt
-    if (!libero) continue
-    const index = team.slots.findIndex((s) => s.current === libero)
-    if (index < 0) continue
-    const slot = team.slots[index]
+    // Read the court, not the bookkeeping: a libero placed by an adjustment that
+    // never set liberoOnCourt is still a libero standing in the wrong place.
+    team.slots.forEach((slot, index) => {
+      if (!team.liberoDesignated.includes(slot.current)) return
 
-    // A libero may only play back row, so rotating into 2, 3 or 4 means a
-    // replacement was missed.
-    if (!BACK_ROW.includes(slot.position)) {
-      out.push({
-        side,
-        target: 'slot',
-        slot: index as SlotIndex,
-        text:
-          `${name}: libero #${libero} is at court position ${slot.position}, which is ` +
-          `front row. She should have been replaced.`,
-      })
-      continue
-    }
+      // A libero cannot be in the front row. If she is, a libero replacement was
+      // missed: the state is wrong, not the operator's last tap.
+      if (!BACK_ROW.includes(slot.position)) {
+        out.push({
+          side,
+          target: 'slot',
+          slot: index as SlotIndex,
+          text:
+            `${name} libero #${slot.current} is in the front row at slot ${ROMAN[index]}. ` +
+            'A libero replacement was probably missed.',
+        })
+        return
+      }
 
-    // A libero may serve in only one serve order slot per set.
-    const locked = team.liberoSlotLock[libero]
-    if (slot.position === 1 && locked !== undefined && locked !== index) {
-      out.push({
-        side,
-        target: 'slot',
-        slot: index as SlotIndex,
-        text:
-          `${name}: libero #${libero} is about to serve from slot ${ROMAN[index]}, but is ` +
-          `locked to slot ${ROMAN[locked]} this set.`,
-      })
-    }
+      // A libero may serve in only one serve order slot per set.
+      const locked = team.liberoSlotLock[slot.current]
+      if (slot.position === 1 && locked !== undefined && locked !== index) {
+        out.push({
+          side,
+          target: 'slot',
+          slot: index as SlotIndex,
+          text:
+            `${name} libero #${slot.current} is about to serve from slot ${ROMAN[index]}, ` +
+            `but is locked to slot ${ROMAN[locked]} this set.`,
+        })
+      }
+    })
   }
   return out
 }

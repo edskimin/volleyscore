@@ -108,6 +108,7 @@ export default function InMatch(props: Props) {
   type Overlay = 'menu' | 'hint' | 'add-home' | 'add-visitor'
   const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [newNumber, setNewNumber] = useState('')
+  const [newName, setNewName] = useState('')
 
   const [clock, setClock] = useState(() => new Date().toTimeString().slice(0, 5))
   useEffect(() => {
@@ -209,6 +210,7 @@ export default function InMatch(props: Props) {
       state.warnings.filter((w) => w.side === side && w.target === 'slot').map((w) => w.slot),
     )
     const budgetSpent = state.warnings.some((w) => w.side === side && w.target === 'subs')
+    const sideWarned = state.warnings.some((w) => w.side === side)
 
     const cells = GRID[side].map((pos) => {
       const idx = t.slots.findIndex((s) => s.position === pos) as SlotIndex
@@ -239,6 +241,7 @@ export default function InMatch(props: Props) {
           <div className="cell-top" style={{ color: sub }}>
             {slot.rn}
             {isLibero(slot.current) && <Triangle em="1em" color={sub} />}
+            {warned.has(idx) && <span className="cell-flag" />}
           </div>
           <div className="cell-bottom">
             <span className="cell-number" style={{ color: fg }}>
@@ -322,6 +325,7 @@ export default function InMatch(props: Props) {
         <div className="panel-head">
           <span className="panel-name" style={{ color: p.ink }}>
             {snap.name}
+            {sideWarned && <span className="head-flag" />}
           </span>
           <span className="panel-sets" style={{ color: p.inkMuted }}>
             sets {state.setsWon[side]}
@@ -541,16 +545,20 @@ export default function InMatch(props: Props) {
         {adding && (
           <div className="sheet sheet-overflow" role="dialog" aria-label="Add a player">
             <div className="sheet-heading">Add a player to {setup[adding].name}</div>
-            Adding a player mid-match reflows the roster row. Prefer entering opponent
-            numbers during warmups.
             <div className="sheet-actions">
               <input
+                className="field-number"
                 inputMode="numeric"
                 autoFocus
                 placeholder="Number"
                 value={newNumber}
                 maxLength={3}
                 onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
+              />
+              <input
+                placeholder="Name, optional"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
               />
               <button className="btn" onClick={() => setOverlay(null)}>
                 Cancel
@@ -562,8 +570,14 @@ export default function InMatch(props: Props) {
                   state.rosters[adding].some((p) => p.number === newNumber.trim())
                 }
                 onClick={() => {
-                  append({ type: 'ROSTER_ADD', team: adding, number: newNumber.trim(), name: null })
+                  append({
+                    type: 'ROSTER_ADD',
+                    team: adding,
+                    number: newNumber.trim(),
+                    name: newName.trim() || null,
+                  })
                   setNewNumber('')
+                  setNewName('')
                   setOverlay(null)
                 }}
               >

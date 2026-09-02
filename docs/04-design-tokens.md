@@ -77,10 +77,10 @@ These meanings are consistent everywhere in the app. Do not introduce a fourth s
 | Filled | solid `cellBack` background | Available, tappable |
 | Outlined | transparent with `rule` border | Already in use, inert |
 | Faded to 28 percent | reduced opacity | Not tappable in this context |
+| Inverted | white background, team-colored text | Selected, or currently serving |
 
 The roster row reads left to right on **both** sides. Only the score block, the court
 grid, and the action bar mirror. Reading order never mirrors.
-| Inverted | white background, team-colored text | Selected, or currently serving |
 
 **Dimmed always means not tappable.** There are no dimmed-but-tappable controls.
 Overriding a rule happens in Fix lineup mode, never by tapping through a dimmed
@@ -174,7 +174,13 @@ court fully live and undo reachable throughout. They never open a modal, never s
 and never self-dismiss. A prompt at set point that blocks undo is the worst possible
 moment to block undo.
 
-**A rule warning is a mark, not a message.** The warnings this app raises are states,
+**A rule warning is a mark, not a message, and the mark has to be loud.** A hairline
+outline reads as decoration and gets missed, which defeats the whole approach. Give
+every warning a two-level find path: an amber dot beside the team name says which
+panel to look at, and a 3px amber outline plus an amber dot on the cell says which
+object is wrong.
+
+The warnings this app raises are states,
 not events: a libero about to serve from a second slot, a sub budget exhausted. Mark
 the object that is wrong and let the mark persist until the condition clears. An
 exhausted budget turns the whole 18 counter amber. A slot in violation gets a 1.5px
@@ -237,6 +243,16 @@ The rail carries a save indicator only. There is deliberately **no offline
 indicator**: the app has no backend and no sync, so being offline changes nothing
 about whether it works or whether data is safe. An indicator for a non-problem is
 noise, and it implies a degraded state that does not exist.
+
+## Writing in the interface
+
+Never explain a consequence the operator cannot act on right now, and never give
+advice at the moment someone is doing the thing the advice discourages. A sheet that
+opens because you tapped "add player" should let you add a player, not tell you that
+you should have entered the number earlier. Cut the sentence rather than softening it.
+
+Labels and field names carry most of the meaning. If a panel needs a paragraph to be
+usable, the panel is wrong.
 
 ## What not to do
 
