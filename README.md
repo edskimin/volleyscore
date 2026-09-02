@@ -77,6 +77,11 @@ collide with a panel. A completed state is the primary text color; an attention 
 `--flag-amber`. Those are the only two, and `src/ui/colors.test.ts` enforces it by
 scanning the stylesheets, so an unsanctioned color fails the suite rather than shipping.
 
+**A sheet anchors to the side of the thing it acts on.** Adding a player to the home
+team opens the sheet on the left, to the visiting team on the right. The screen is
+already mirrored, so a sheet that ignores that makes the title the only signal of which
+team is changing instead of a confirmation of it.
+
 **Nothing that can appear mid-match may displace the court.** A tap target that moves
 is a mis-recorded rally. The overflow menu, the hint, the add-player sheet and the set
 and match end prompts are all absolutely positioned sheets above a `--scrim`, anchored
@@ -97,8 +102,9 @@ npm run dev
 npm test
 ```
 
-`scripts/probe.js` holds two browser probes for the in-match screen: `layoutProbe()`
-asserts no overlay displaces the court, and `colorProbe()` asserts nothing renders a
+`scripts/probe.js` holds three browser probes for the in-match screen: `layoutProbe()`
+asserts no overlay displaces the court, `anchorProbe()` asserts a team-scoped sheet
+opens on that team's side, and `colorProbe()` asserts nothing renders a
 color outside the chrome tokens, the derived team shades and `--flag-amber`, and that
 every warning mark is amber and thick enough to find. Both exist because a defect got
 past a screenshot.

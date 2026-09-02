@@ -103,6 +103,7 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--app-bg);
+  color: var(--text-primary);
 
   /* Every size below is a share of the stage height. */
   --s1: 0.5cqh;
@@ -408,8 +409,28 @@ body {
 }
 .sheet[hidden] { display: none; }
 
-/* Anchored above the action bar, aligned to the control that opened it. */
-.sheet-overflow { right: var(--s4); bottom: 11cqh; }
+/* A sheet anchors to the SIDE of the thing it acts on. The screen is already
+   mirrored, so a sheet that ignores that makes you re-read its title to work
+   out which team you are affecting. */
+.sheet-left   { left:  var(--s4); bottom: 11cqh; }
+.sheet-right  { right: var(--s4); bottom: 11cqh; }
+.sheet-centre { left: 50%; transform: translateX(-50%); bottom: 11cqh; }
+
+.sheet-title { color: var(--text-primary); font-size: var(--type-body); margin-bottom: var(--s2); }
+.sheet-row { display: flex; gap: var(--s1); align-items: center; }
+.field {
+  flex: 1 1 auto; min-width: 0;
+  padding: 1.2cqh 1.6cqh;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--type-body);
+}
+.field::placeholder { color: var(--text-muted); }
+.sheet-menu { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
+.sheet-menu .btn { justify-content: flex-start; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -483,7 +504,7 @@ body {
   </footer>
 
   <div class="scrim" id="scrim" hidden></div>
-  <div class="sheet sheet-overflow" id="hint" hidden role="dialog" aria-label="How this screen works"></div>
+  <div class="sheet" id="sheet" hidden role="dialog"></div>
 </div>
 </div>
 
@@ -567,7 +588,7 @@ var S = {
   targetScore: 25,
   serveTeam: "home",
   selection: null,
-  hintOpen: false,
+  sheet: null,          /* null | "overflow" | "add-home" | "add-visitor" */
   log: [],
   home: makeTeam({
     name: "Avon Lake", color: "#14284B", captain: "12", liberos: ["30"],
@@ -795,18 +816,46 @@ function render() {
       Math.max(S.home.points, S.visitor.points) + "\u2013" + Math.min(S.home.points, S.visitor.points);
   }
 
-  var hint = document.getElementById("hint");
-  hint.hidden = !S.hintOpen;
-  document.getElementById("scrim").hidden = !S.hintOpen;
-  hint.innerHTML =
-    "Tap a score to award that team the point. Tap the same thing twice to clear a selection.<br>" +
-    "Substitutions work in either direction: tap an available number then the player coming out, or tap " +
-    "a player on court then her replacement. A player who has already been on this set can only return " +
-    "to her own serve-order slot, shown on her chip, so other spots dim out. Dimmed means not tappable; " +
-    "use Fix lineup to override. Liberos are marked with a triangle and can only enter the back row. " +
-    "Libero replacements do not count against the 18." +
-    warningsBlock();
+  renderSheet();
   bind();
+}
+
+function renderSheet() {
+  var el = document.getElementById("sheet");
+  document.getElementById("scrim").hidden = !S.sheet;
+  el.hidden = !S.sheet;
+  if (!S.sheet) return;
+
+  if (S.sheet === "overflow") {
+    el.className = "sheet sheet-right";
+    el.innerHTML =
+      '<div class="sheet-title">How this screen works</div>' +
+      "Tap a score to award that team the point. Tap the same thing twice to clear a selection. " +
+      "Substitutions work in either direction: tap an available number then the player coming out, or tap " +
+      "a player on court then her replacement. A player who has already been on this set can only return " +
+      "to her own serve-order slot, shown on her chip, so other spots dim out. Dimmed means not tappable; " +
+      "use Fix lineup to override. Liberos are marked with a triangle and can only enter the back row. " +
+      "Libero replacements do not count against the 18." +
+      warningsBlock() +
+      '<div class="sheet-menu">' +
+        '<button class="btn" data-open="add-home">Add player to ' + S.home.name + "</button>" +
+        '<button class="btn" data-open="add-visitor">Add player to ' + S.visitor.name + "</button>" +
+      "</div>";
+    return;
+  }
+
+  /* Add player: anchored to the side of the team being changed. */
+  var side = S.sheet === "add-home" ? "home" : "visitor";
+  el.className = "sheet " + (side === "home" ? "sheet-left" : "sheet-right");
+  el.innerHTML =
+    '<div class="sheet-title">Add a player to ' + S[side].name + "</div>" +
+    '<div class="sheet-row">' +
+      '<input class="field" id="f-num" placeholder="Number" inputmode="numeric">' +
+      '<input class="field" id="f-name" placeholder="Name, optional">' +
+      '<button class="btn" data-sheet-close="1">Cancel</button>' +
+      '<button class="btn btn-primary" data-add="' + side + '">Add</button>' +
+    "</div>";
+  document.getElementById("f-num").focus();
 }
 
 /* Warnings are marked in place on the court and the sub row. This block is
@@ -814,7 +863,7 @@ function render() {
 function warningsBlock() {
   var w = warnings();
   if (!w.length) return "";
-  return '<div style="margin-top:1.2cqh;padding-top:1.2cqh;border-top:1px solid var(--border);color:var(--flag-amber)">' +
+  return '<div style="margin-top:1.5cqh;padding-top:1.5cqh;border-top:1px solid var(--border);color:var(--flag-amber)">' +
          w.map(function(x) { return x.text; }).join("<br>") + "</div>";
 }
 
@@ -920,10 +969,25 @@ function bind() {
 }
 
 document.getElementById("undo-btn").onclick = undo;
-document.getElementById("more-btn").onclick = function() { S.hintOpen = !S.hintOpen; render(); };
-document.getElementById("scrim").onclick = function() { S.hintOpen = false; render(); };
+document.getElementById("more-btn").onclick = function() {
+  S.sheet = S.sheet === "overflow" ? null : "overflow"; render();
+};
+document.getElementById("scrim").onclick = function() { S.sheet = null; render(); };
 document.addEventListener("keydown", function(e) {
-  if (e.key === "Escape" && S.hintOpen) { S.hintOpen = false; render(); }
+  if (e.key === "Escape" && S.sheet) { S.sheet = null; render(); }
+});
+document.getElementById("sheet").addEventListener("click", function(e) {
+  var t = e.target.closest("[data-open],[data-add],[data-sheet-close]");
+  if (!t) return;
+  if (t.dataset.sheetClose) { S.sheet = null; return render(); }
+  if (t.dataset.open) { S.sheet = t.dataset.open; return render(); }
+  var side = t.dataset.add, num = document.getElementById("f-num").value.trim();
+  if (!num || S[side].roster.indexOf(num) !== -1) return;
+  S.log.push(snapshot());
+  S[side].roster.push(num);
+  S[side].roster.sort(function(a, b) { return (+a) - (+b); });
+  S.sheet = null;
+  render();
 });
 document.getElementById("theme-btn").onclick = function() {
   S.theme = S.theme === "dark" ? "light" : "dark";

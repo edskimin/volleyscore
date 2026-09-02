@@ -74,10 +74,6 @@ body.in-match-host #root { display: flex; }
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 
-  /* The reference relies on the UA default here because its body sets no color.
-     Ours does, for the screens not yet ported, so the stage states its own or the
-     legacy text color leaks in by inheritance. */
-
   /* Every size below is a share of the stage height. */
   --s1: 0.5cqh;
   --s2: 1cqh;
@@ -385,47 +381,37 @@ body.in-match-host #root { display: flex; }
 }
 .app .sheet[hidden] { display: none; }
 
-/* Anchored above the action bar, aligned to the control that opened it. */
-.app .sheet-overflow { right: var(--s4); bottom: 11cqh; }
+/* A sheet anchors to the SIDE of the thing it acts on. The screen is already
+   mirrored, so a sheet that ignores that makes you re-read its title to work
+   out which team you are affecting. */
+.app .sheet-left   { left:  var(--s4); bottom: 11cqh; }
+.app .sheet-right  { right: var(--s4); bottom: 11cqh; }
+.app .sheet-centre { left: 50%; transform: translateX(-50%); bottom: 11cqh; }
 
-@media (prefers-reduced-motion: reduce) { .app * { transition: none !important; } }
-
-/* ---------------------------------------------------------------------------
-   8. NOT IN THE REFERENCE
-   Layout only, for sheet contents the reference does not have: the overflow
-   menu, the add-player sheet, the set and match end prompts, and the rule
-   warnings. Every value is from the spacing and type scales. No new colors,
-   radii or surfaces, and nothing here displaces the court.
-   --------------------------------------------------------------------------- */
-.app .sheet-heading {
-  font-size: var(--type-body);
-  color: var(--text-primary);
-  margin-bottom: var(--s2);
-}
-.app .sheet-menu { display: flex; flex-direction: column; gap: var(--s1); }
-.app .sheet-menu .btn { justify-content: flex-start; }
-.app .sheet-actions { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
-.app .sheet-actions .spacer { flex: 1 1 auto; }
-.app .sheet input {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 1.2cqh 2cqh;
-  border-radius: var(--radius-control);
+.app .sheet-title { color: var(--text-primary); font-size: var(--type-body); margin-bottom: var(--s2); }
+.app .sheet-row { display: flex; gap: var(--s1); align-items: center; }
+.app .field {
+  flex: 1 1 auto; min-width: 0;
+  padding: 1.2cqh 1.6cqh;
   border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-primary);
   font-family: inherit;
   font-size: var(--type-body);
-  font-variant-numeric: tabular-nums;
 }
-.app .sheet input:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.app .field::placeholder { color: var(--text-muted); }
+.app .sheet-menu { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
+.app .sheet-menu .btn { justify-content: flex-start; }
+
+@media (prefers-reduced-motion: reduce) { .app * { transition: none !important; } }
 
 /* The reference copy of any active warning, read when there is a moment. */
 .app .sheet-warnings {
-  margin-top: 1.2cqh;
-  padding-top: 1.2cqh;
+  margin-top: 1.5cqh;
+  padding-top: 1.5cqh;
   border-top: 1px solid var(--border);
   color: var(--flag-amber);
 }
 /* Jersey numbers are short; a name is not. */
-.app .sheet input.field-number { flex: 0 0 14cqh; }
+.app .field-number { flex: 0 0 16cqh; }

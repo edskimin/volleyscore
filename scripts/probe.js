@@ -2,7 +2,9 @@
  * In-match screen probe. Paste into the browser console with the in-match screen open.
  *
  *   layoutProbe()  asserts no overlay displaces the court
- *   colorProbe()   asserts nothing renders a color outside the sanctioned set
+ *   anchorProbe()  asserts a team-scoped sheet opens on that team's side
+ *   colorProbe()   asserts nothing renders a color outside the sanctioned set,
+ *                  and that every warning mark is amber and thick enough to find
  *
  * Both were written because a defect got past a screenshot: the first because an
  * earlier port put the hint in the layout flow, the second because a green check mark
@@ -145,4 +147,43 @@ function colorProbe(teamHexes) {
     markChecks: marks.length,
     markFailures: marks.filter((m) => !m.ok),
   }
+}
+
+
+/* A sheet anchors to the SIDE of the thing it acts on. Opening "add player" for the
+   home team must put the sheet on the same side as the home panel, or the operator
+   has to read the title to know which team they are changing. */
+async function anchorProbe() {
+  const app = document.querySelector('.app')
+  const more = [...document.querySelectorAll('.bar-group.centre .btn')][2]
+  const sideOfPanel = (side) => {
+    const p = document.querySelector(`.panel[data-side="${side}"]`).getBoundingClientRect()
+    const a = app.getBoundingClientRect()
+    return p.left - a.left < a.right - p.right ? 'left' : 'right'
+  }
+
+  const results = []
+  for (const side of ['home', 'visitor']) {
+    more.click()
+    await new Promise((r) => setTimeout(r, 200))
+    const open = [...document.querySelectorAll('.sheet .btn')].find((b) =>
+      b.textContent.trim().startsWith('Add player to'),
+    )
+    const buttons = [...document.querySelectorAll('.sheet .btn')].filter((b) =>
+      b.textContent.trim().startsWith('Add player to'),
+    )
+    buttons[side === 'home' ? 0 : 1].click()
+    await new Promise((r) => setTimeout(r, 250))
+
+    const a = app.getBoundingClientRect()
+    const s = document.querySelector('.sheet:not([hidden])').getBoundingClientRect()
+    const anchored = s.left - a.left < a.right - s.right ? 'left' : 'right'
+    const expected = sideOfPanel(side)
+    results.push({ side, expected, anchored, ok: anchored === expected, title: document.querySelector('.sheet-title').textContent })
+
+    document.querySelector('.scrim').click()
+    await new Promise((r) => setTimeout(r, 200))
+    void open
+  }
+  return { results, pass: results.every((r) => r.ok) }
 }

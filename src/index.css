@@ -96,16 +96,16 @@ button {
 .app-root .btn.danger { color: var(--flag-amber); }
 .app-root .btn.lg { padding: 0.95rem 1.5rem; font-size: 1.05rem; }
 
-.field { display: grid; gap: 0.35rem; }
-.field > label {
+.app-root .field { display: grid; gap: 0.35rem; }
+.app-root .field > label {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   color: var(--fg-faint);
   font-weight: 600;
 }
-.field input,
-.field select {
+.app-root .field input,
+.app-root .field select {
   font: inherit;
   padding: 0.6rem 0.7rem;
   border-radius: var(--r-sm);
@@ -114,8 +114,8 @@ button {
   color: var(--fg);
   min-width: 0;
 }
-.field input:focus,
-.field select:focus { outline: 2px solid var(--line-strong); outline-offset: -1px; }
+.app-root .field input:focus,
+.app-root .field select:focus { outline: 2px solid var(--line-strong); outline-offset: -1px; }
 
 .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px; gap: 3px; }
 .seg button { padding: 0.45rem 0.85rem; border-radius: 9px; font-size: 0.88rem; color: var(--fg-dim); }
@@ -202,7 +202,7 @@ button {
 .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--pad); align-items: start; }
 .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.9rem; }
 /* An official's name plus an OHSAA number does not fit one grid track. */
-.field.official { grid-column: span 2; }
+.app-root .field.official { grid-column: span 2; }
 .pair { display: grid; grid-template-columns: 1fr 108px; gap: 0.4rem; }
 @media (max-width: 720px) { .field.official { grid-column: span 1; } }
 

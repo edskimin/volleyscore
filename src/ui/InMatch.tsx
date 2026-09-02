@@ -105,7 +105,7 @@ export default function InMatch(props: Props) {
   const { setup, state, events, append, undoLast, canUndo, theme } = props
   const [sel, setSel] = useState<Selection>(null)
   /** One overlay at a time. Null means the court is unobstructed. */
-  type Overlay = 'menu' | 'hint' | 'add-home' | 'add-visitor'
+  type Overlay = 'menu' | 'add-home' | 'add-visitor'
   const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [newNumber, setNewNumber] = useState('')
   const [newName, setNewName] = useState('')
@@ -478,114 +478,111 @@ export default function InMatch(props: Props) {
             that moves is a mis-recorded rally. Everything below floats above it. */}
         <div className="scrim" hidden={overlay === null} onClick={() => setOverlay(null)} />
 
+        {/* One sheet element. Its anchor is the side of the thing it acts on, so the
+            operator does not have to read the title to know which team changes. */}
         <div
-          className="sheet sheet-overflow"
-          hidden={overlay !== 'menu'}
+          className={`sheet ${overlay === 'add-home' ? 'sheet-left' : 'sheet-right'}`}
+          hidden={overlay === null}
           role="dialog"
-          aria-label="More actions"
+          aria-label={adding ? `Add a player to ${setup[adding].name}` : 'How this screen works'}
         >
-          <div className="sheet-menu">
-            <button className="btn" onClick={() => { setOverlay(null); props.onAdjust() }}>
-              Fix lineup
-            </button>
-            <button className="btn" onClick={() => setOverlay('add-home')}>
-              Add player to {setup.home.name}
-            </button>
-            <button className="btn" onClick={() => setOverlay('add-visitor')}>
-              Add player to {setup.visitor.name}
-            </button>
-            <button className="btn" onClick={() => { setOverlay(null); append({ type: 'RESERVE' }) }}>
-              Re-serve
-            </button>
-            {state.setInProgress && (
-              <button
-                className="btn"
-                onClick={() => {
-                  setOverlay(null)
-                  append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
-                }}
-              >
-                End set {state.currentSet} manually
-              </button>
-            )}
-            <button className="btn" onClick={() => { setOverlay(null); props.onEditSetup() }}>
-              Edit teams
-            </button>
-            <button className="btn" onClick={() => { setOverlay(null); props.onExport() }}>
-              Export
-            </button>
-            <button className="btn" onClick={() => { setOverlay(null); props.onCloseout() }}>
-              Finish match
-            </button>
-            <button className="btn" onClick={() => { setOverlay(null); props.onHome() }}>
-              Matches
-            </button>
-            <button className="btn" onClick={() => setOverlay('hint')}>
-              How this works
-            </button>
-          </div>
-        </div>
+          {overlay === 'menu' && (
+            <>
+              <div className="sheet-title">How this screen works</div>
+              {HINT}
+              {state.warnings.length > 0 && (
+                <div className="sheet-warnings">
+                  {state.warnings.map((w) => (
+                    <div key={w.text}>{w.text}</div>
+                  ))}
+                </div>
+              )}
+              <div className="sheet-menu">
+                <button className="btn" onClick={() => { setOverlay(null); props.onAdjust() }}>
+                  Fix lineup
+                </button>
+                <button className="btn" onClick={() => setOverlay('add-home')}>
+                  Add player to {setup.home.name}
+                </button>
+                <button className="btn" onClick={() => setOverlay('add-visitor')}>
+                  Add player to {setup.visitor.name}
+                </button>
+                <button className="btn" onClick={() => { setOverlay(null); append({ type: 'RESERVE' }) }}>
+                  Re-serve
+                </button>
+                {state.setInProgress && (
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      setOverlay(null)
+                      append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
+                    }}
+                  >
+                    End set {state.currentSet} manually
+                  </button>
+                )}
+                <button className="btn" onClick={() => { setOverlay(null); props.onEditSetup() }}>
+                  Edit teams
+                </button>
+                <button className="btn" onClick={() => { setOverlay(null); props.onExport() }}>
+                  Export
+                </button>
+                <button className="btn" onClick={() => { setOverlay(null); props.onCloseout() }}>
+                  Finish match
+                </button>
+                <button className="btn" onClick={() => { setOverlay(null); props.onHome() }}>
+                  Matches
+                </button>
+              </div>
+            </>
+          )}
 
-        <div
-          className="sheet sheet-overflow"
-          hidden={overlay !== 'hint'}
-          role="dialog"
-          aria-label="How this screen works"
-        >
-          {HINT}
-          {state.warnings.length > 0 && (
-            <div className="sheet-warnings">
-              {state.warnings.map((w) => (
-                <div key={w.text}>{w.text}</div>
-              ))}
-            </div>
+          {adding && (
+            <>
+              <div className="sheet-title">Add a player to {setup[adding].name}</div>
+              <div className="sheet-row">
+                <input
+                  className="field field-number"
+                  inputMode="numeric"
+                  autoFocus
+                  placeholder="Number"
+                  value={newNumber}
+                  maxLength={3}
+                  onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
+                />
+                <input
+                  className="field"
+                  placeholder="Name, optional"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                />
+                <button className="btn" onClick={() => setOverlay(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  disabled={
+                    !newNumber.trim() ||
+                    state.rosters[adding].some((p) => p.number === newNumber.trim())
+                  }
+                  onClick={() => {
+                    append({
+                      type: 'ROSTER_ADD',
+                      team: adding,
+                      number: newNumber.trim(),
+                      name: newName.trim() || null,
+                    })
+                    setNewNumber('')
+                    setNewName('')
+                    setOverlay(null)
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </>
           )}
         </div>
-
-        {adding && (
-          <div className="sheet sheet-overflow" role="dialog" aria-label="Add a player">
-            <div className="sheet-heading">Add a player to {setup[adding].name}</div>
-            <div className="sheet-actions">
-              <input
-                className="field-number"
-                inputMode="numeric"
-                autoFocus
-                placeholder="Number"
-                value={newNumber}
-                maxLength={3}
-                onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
-              />
-              <input
-                placeholder="Name, optional"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-              <button className="btn" onClick={() => setOverlay(null)}>
-                Cancel
-              </button>
-              <button
-                className="btn"
-                disabled={
-                  !newNumber.trim() ||
-                  state.rosters[adding].some((p) => p.number === newNumber.trim())
-                }
-                onClick={() => {
-                  append({
-                    type: 'ROSTER_ADD',
-                    team: adding,
-                    number: newNumber.trim(),
-                    name: newName.trim() || null,
-                  })
-                  setNewNumber('')
-                  setNewName('')
-                  setOverlay(null)
-                }}
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        )}
 
       </div>
     </div>

@@ -160,6 +160,12 @@ Sheets use `--rail-bg`, a 1px `--border`, and `--radius-panel`. Width is
 `min-width: var(--sheet-min)` (48cqh) and `max-width: var(--sheet-max)` (86cqh).
 A sheet anchored above the action bar sits at `bottom: 11cqh`.
 
+**A sheet anchors to the side of the thing it acts on.** Adding a player to the home
+team opens the sheet on the left; to the visiting team, on the right. The screen is
+already mirrored, so a sheet that ignores that forces the operator to re-read a title
+they would otherwise not need. Use `.sheet-left`, `.sheet-right`, or `.sheet-centre`
+for sheets that belong to neither team.
+
 Tapping the scrim or pressing Escape dismisses. No shadows; the border and scrim
 carry the separation.
 
@@ -183,8 +189,9 @@ object is wrong.
 The warnings this app raises are states,
 not events: a libero about to serve from a second slot, a sub budget exhausted. Mark
 the object that is wrong and let the mark persist until the condition clears. An
-exhausted budget turns the whole 18 counter amber. A slot in violation gets a 1.5px
-amber outline on its court cell. Never a toast, a banner, or a rail message: during a
+exhausted budget turns the whole 18 counter amber. A slot in violation gets the 3px
+amber outline and cell dot described above. Never a toast, a banner, or a rail
+message: during a
 rally the operator is looking at the court and the scores, and a line in the corner
 will not be read. The overflow sheet carries the full text of any active warning for
 when there is a moment to read it.
