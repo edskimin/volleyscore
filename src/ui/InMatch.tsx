@@ -118,8 +118,8 @@ export default function InMatch(props: Props) {
 
   // The stage owns the whole viewport while this screen is mounted.
   useEffect(() => {
-    document.body.classList.add('in-match-host')
-    return () => document.body.classList.remove('in-match-host')
+    document.body.classList.add('stage-host')
+    return () => document.body.classList.remove('stage-host')
   }, [])
 
 
@@ -362,7 +362,7 @@ export default function InMatch(props: Props) {
 
   return (
     <div className="stage">
-      <div className="app">
+      <div className="app in-match">
         <header className="rail">
           <div className="rail-left">
             <span className="rail-level">{setup.level === 'jv' ? 'JV' : setup.level}</span>

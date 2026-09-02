@@ -1,7 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { lineupProblemSlots, lineupProblems } from '../model/lineup'
-import { ROMAN, type EventBody, type MatchSetup, type TeamSide } from '../model/types'
+import { initialPosition } from '../model/reducer'
+import { lineupProblems } from '../model/lineup'
+import {
+  ROMAN,
+  type CourtPosition,
+  type EventBody,
+  type MatchSetup,
+  type SlotIndex,
+  type TeamSide,
+} from '../model/types'
+import { derivePalette } from './palette'
+import type { Theme } from './palette'
+import './set-setup.css'
 
 /**
  * The in-progress set setup. This lives in App rather than in this component: going to
@@ -21,6 +32,8 @@ interface Props {
   draft: SetDraft
   onDraftChange: (next: SetDraft) => void
   setsWon: Record<TeamSide, number>
+  theme: Theme
+  onToggleTheme: () => void
   onBack: () => void
   onEditSetup: () => void
   onSheet: () => void
@@ -28,103 +41,49 @@ interface Props {
   onStart: (body: EventBody) => void
 }
 
-function LineupEditor({
-  side,
-  setup,
-  lineup,
-  liberos,
-  onAssign,
-  onToggleLibero,
-  problemSlots,
-  showProblems,
-}: {
-  side: TeamSide
-  setup: MatchSetup
-  lineup: (string | null)[]
-  liberos: string[]
-  onAssign: (slot: number, player: string | null) => void
-  onToggleLibero: (player: string) => void
-  problemSlots: Set<number>
-  showProblems: boolean
-}) {
-  const [selected, setSelected] = useState<number | null>(null)
-  const team = setup[side]
+const SIDES: TeamSide[] = ['home', 'visitor']
+const GRID: Record<TeamSide, CourtPosition[]> = {
+  home: [5, 4, 6, 3, 1, 2],
+  visitor: [2, 1, 3, 6, 4, 5],
+}
+const FRONT: CourtPosition[] = [2, 3, 4]
 
-  // A libero cannot be a starter; she replaces someone already on court.
-  const assignable = team.roster.filter((p) => !liberos.includes(p.number))
-  const designated = team.roster.filter((p) => team.liberoNumbers.includes(p.number))
-
-  function tapPlayer(number: string) {
-    if (selected === null) return
-    // One call, because the parent owns the draft: clearing the old slot and filling
-    // the new one as two updates would both derive from the same stale draft, the
-    // clear would be lost, and the player would end up in two slots at once.
-    onAssign(selected, number)
-    const next = lineup.findIndex((v, i) => i > selected && v === null)
-    setSelected(next >= 0 ? next : null)
-  }
-
+function Triangle({ color }: { color: string }) {
   return (
-    <section className="card lineup-editor">
-      <header style={{ borderColor: team.colorPrimary }}>
-        <span className="eyebrow">{side}</span>
-        <b>{team.name}</b>
-      </header>
+    <svg
+      width="1em"
+      height="0.88em"
+      viewBox="0 0 20 18"
+      style={{ fontSize: '0.75em' }}
+      aria-hidden="true"
+    >
+      <polygon points="10,1.5 18.5,16.5 1.5,16.5" fill="none" stroke={color} strokeWidth="1.6" />
+    </svg>
+  )
+}
 
-      <div className="slots">
-        {ROMAN.map((rn, i) => (
-          <button
-            key={rn}
-            className={[
-              'slot',
-              lineup[i] ? 'filled' : '',
-              selected === i ? 'selected' : '',
-              showProblems && problemSlots.has(i) ? 'problem' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            onClick={() => setSelected(selected === i ? null : i)}
-          >
-            <em>{rn}</em>
-            <b className="num">{lineup[i] ?? '·'}</b>
-            {i === 0 && <i>first server</i>}
+function Segment({
+  label,
+  options,
+  current,
+  onPick,
+}: {
+  label: string
+  options: Array<{ v: string; t: string }>
+  current: string
+  onPick: (v: string) => void
+}) {
+  return (
+    <div className="control">
+      <span className="control-label">{label}</span>
+      <div className="seg">
+        {options.map((o) => (
+          <button key={o.v} aria-pressed={o.v === current} onClick={() => onPick(o.v)}>
+            {o.t}
           </button>
         ))}
       </div>
-
-      <div className="picker">
-        {assignable.map((p) => {
-          const used = lineup.includes(p.number)
-          return (
-            <button
-              key={p.number}
-              className={`chip${used ? ' used' : ''}`}
-              disabled={selected === null}
-              onClick={() => tapPlayer(p.number)}
-              style={used ? { background: team.colorPrimary, color: team.colorText } : undefined}
-            >
-              <span className="num">{p.number}</span>
-              {p.captain && <i>c</i>}
-            </button>
-          )
-        })}
-      </div>
-
-      {designated.length > 0 && (
-        <div className="libero-row">
-          <span className="eyebrow">Libero this set</span>
-          {designated.map((p) => (
-            <button
-              key={p.number}
-              className={`chip libero${liberos.includes(p.number) ? ' on' : ''}`}
-              onClick={() => onToggleLibero(p.number)}
-            >
-              <span className="num">{p.number}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
+    </div>
   )
 }
 
@@ -133,50 +92,52 @@ export default function SetSetupScreen({
   draft,
   onDraftChange,
   setsWon,
+  theme,
+  onToggleTheme,
   onBack,
   onEditSetup,
   onSheet,
   onCloseout,
   onStart,
 }: Props) {
-  const [showProblems, setShowProblems] = useState(false)
   const { lineups, liberos, firstServe, targetScore, sidesSwitched } = draft
+  /** Which slot the next chip fills. Transient, so it stays local. */
+  const [active, setActive] = useState<Record<TeamSide, number>>({ home: 0, visitor: 0 })
+
+  useEffect(() => {
+    document.body.classList.add('stage-host')
+    return () => document.body.classList.remove('stage-host')
+  }, [])
+
   const patch = (p: Partial<SetDraft>) => onDraftChange({ ...draft, ...p })
+  const complete = (side: TeamSide) =>
+    lineupProblems(lineups[side], setup[side].name || side).length === 0
+  const ready = complete('home') && complete('visitor')
 
-  const problemSlots = useMemo(
-    () => ({
-      home: lineupProblemSlots(lineups.home),
-      visitor: lineupProblemSlots(lineups.visitor),
-    }),
-    [lineups],
-  )
-
-  /** What is stopping the set from starting, in words. */
-  const problems = useMemo(
-    () =>
-      (['home', 'visitor'] as TeamSide[]).flatMap((side) =>
-        lineupProblems(lineups[side], setup[side].name || side),
-      ),
-    [lineups, setup],
-  )
-
-  const complete = problems.length === 0
-
-  // A decided match still offers another set, in case the result needs correcting,
-  // but closing out is the primary action once it is.
   const needed = setup.format === 'best_of_5' ? 3 : 2
   const matchDecided = Math.max(setsWon.home, setsWon.visitor) >= needed
 
-  function assign(side: TeamSide, slot: number, player: string | null) {
+  /* Chip tap is the primary path: fill the active slot, advance. Six taps. */
+  function tapChip(side: TeamSide, jersey: string) {
+    if (lineups[side].includes(jersey)) return
+    const i = active[side]
     const next = [...lineups[side]]
-    // Placing a player who already holds another slot moves her rather than
-    // duplicating her, so a mis-tap is one tap to fix.
-    if (player !== null) {
-      const existing = next.indexOf(player)
-      if (existing >= 0 && existing !== slot) next[existing] = null
-    }
-    next[slot] = player
+    next[i] = jersey
     patch({ lineups: { ...lineups, [side]: next } })
+    setActive((a) => ({ ...a, [side]: nextEmptyIn(next, i + 1) }))
+  }
+
+  function nextEmptyIn(l: (string | null)[], from: number) {
+    for (let i = 0; i < 6; i++) {
+      const j = (from + i) % 6
+      if (!l[j]) return j
+    }
+    return from % 6
+  }
+
+  function clear(side: TeamSide) {
+    patch({ lineups: { ...lineups, [side]: [null, null, null, null, null, null] } })
+    setActive((a) => ({ ...a, [side]: 0 }))
   }
 
   function toggleLibero(side: TeamSide, player: string) {
@@ -194,7 +155,6 @@ export default function SetSetupScreen({
   }
 
   function start() {
-    setShowProblems(false)
     onStart({
       type: 'SET_STARTED',
       setNumber: draft.setNumber,
@@ -207,120 +167,191 @@ export default function SetSetupScreen({
     })
   }
 
+  function renderCard(side: TeamSide) {
+    const snap = setup[side]
+    const p = derivePalette(snap.colorPrimary, theme)
+    const lineup = lineups[side]
+    const roster = [...snap.roster].sort((a, b) => Number(a.number) - Number(b.number))
+    const designated = snap.roster.filter((r) => snap.liberoNumbers.includes(r.number))
+
+    return (
+      <section className="card" data-side={side} key={side}>
+        <div className="card-head" style={{ borderBottomColor: p.base }}>
+          <span className="card-role">{side === 'home' ? 'Home' : 'Visitor'}</span>
+          <span className="card-name">{snap.name}</span>
+        </div>
+
+        <div className="card-body">
+          <div className="order">
+            {lineup.map((n, i) => (
+              <button
+                key={i}
+                className="slot"
+                data-active={active[side] === i}
+                onClick={() => setActive((a) => ({ ...a, [side]: i }))}
+              >
+                <span className="slot-rn">{ROMAN[i]}</span>
+                {n ? (
+                  <span className="slot-num">{n}</span>
+                ) : (
+                  <span className="slot-empty">&mdash;</span>
+                )}
+                {firstServe === side && i === 0 && <span className="slot-first">first server</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* Derived court. Reading it against the floor is what catches a mis-tap.
+              initialPosition is the reducer's own rule, so what is previewed here is
+              exactly what SET_STARTED will produce. */}
+          <div className="preview">
+            <div className="preview-label">On court</div>
+            <div className="court">
+              {GRID[side].map((pos) => {
+                let idx = -1
+                for (let i = 0; i < 6; i++) {
+                  if (initialPosition(i as SlotIndex, firstServe === side) === pos) idx = i
+                }
+                const n = lineup[idx]
+                return (
+                  <div
+                    key={pos}
+                    className="pcell"
+                    style={{ background: FRONT.includes(pos) ? p.cellFront : p.cellBack }}
+                  >
+                    <span className="pcell-rn" style={{ color: p.inkMuted }}>
+                      {ROMAN[idx]}
+                    </span>
+                    <span className="pcell-num" style={{ color: n ? p.ink : p.inkMuted }}>
+                      {n ?? '—'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="roster-label">
+          Tap in serve order
+          <button
+            className="btn btn-quiet"
+            style={{ marginLeft: '1cqh' }}
+            onClick={() => clear(side)}
+          >
+            Clear
+          </button>
+        </div>
+        <div className="roster">
+          {roster.map((r) => {
+            const placed = lineup.includes(r.number)
+            return (
+              <button
+                key={r.number}
+                className="chip"
+                data-state={placed ? 'placed' : 'free'}
+                disabled={placed}
+                onClick={() => tapChip(side, r.number)}
+              >
+                {snap.liberoNumbers.includes(r.number) && (
+                  <Triangle color={placed ? 'var(--text-muted)' : 'var(--text-primary)'} />
+                )}
+                {r.number}
+              </button>
+            )
+          })}
+        </div>
+
+        {designated.length > 0 && (
+          <div className="libero-row">
+            <span className="control-label">Libero this set</span>
+            {designated.map((r) => (
+              <button
+                key={r.number}
+                className="lchip"
+                aria-pressed={liberos[side].includes(r.number)}
+                onClick={() => toggleLibero(side, r.number)}
+              >
+                <Triangle color="currentColor" />
+                {r.number}
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
   return (
-    <div className="screen screen-scroll setup">
-      <div className="topbar">
-        <button className="btn ghost" onClick={onBack}>
-          ← Back
-        </button>
-        <h1>
-          Set {draft.setNumber}
-          {setsWon.home + setsWon.visitor > 0 && (
-            <span className="muted num">
-              {' '}
-              · {setsWon.home}–{setsWon.visitor}
-            </span>
-          )}
-        </h1>
-        <div className="spacer" />
-        <button className="btn ghost" onClick={onEditSetup}>
-          Edit teams
-        </button>
-        {setsWon.home + setsWon.visitor > 0 && (
-          <button className="btn ghost" onClick={onSheet}>
-            Sheet
-          </button>
-        )}
-        {matchDecided && (
-          <button className="btn primary lg" onClick={onCloseout}>
-            Finish match
-          </button>
-        )}
-        {/* Always clickable: a dead button cannot say what is wrong with the lineup. */}
-        <button
-          className={matchDecided ? 'btn lg' : 'btn primary lg'}
-          onClick={() => (complete ? start() : setShowProblems(true))}
-          aria-disabled={!complete}
-        >
-          Start set
-        </button>
-      </div>
-
-      <div className="set-controls card">
-        <div className="field">
-          <label>First serve</label>
-          <div className="seg">
-            {(['home', 'visitor'] as TeamSide[]).map((side) => (
-              <button
-                key={side}
-                aria-pressed={firstServe === side}
-                onClick={() => patch({ firstServe: side })}
-              >
-                {setup[side].name || side}
-              </button>
-            ))}
+    <div className="stage">
+      <div className="app set-setup">
+        <header className="rail">
+          <div className="rail-left">
+            <button className="btn" onClick={onBack}>
+              Back
+            </button>
+            <span className="rail-title">Set {draft.setNumber}</span>
+            {draft.setNumber > 1 && (
+              <span className="rail-sub">
+                Lineups carried over from set {draft.setNumber - 1}. Change what moved.
+              </span>
+            )}
           </div>
-        </div>
-        <div className="field">
-          <label>Play to</label>
-          <div className="seg">
-            {[15, 25].map((n) => (
-              <button
-                key={n}
-                className="num"
-                aria-pressed={targetScore === n}
-                onClick={() => patch({ targetScore: n })}
-              >
-                {n}
+          <div className="rail-right">
+            <button className="btn" onClick={onEditSetup}>
+              Edit teams
+            </button>
+            {setsWon.home + setsWon.visitor > 0 && (
+              <button className="btn" onClick={onSheet}>
+                Sheet
               </button>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <label>Sides</label>
-          <div className="seg">
+            )}
+            <button className="btn" onClick={onToggleTheme}>
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </button>
+            {matchDecided && (
+              <button className="btn btn-primary" onClick={onCloseout}>
+                Finish match
+              </button>
+            )}
             <button
-              aria-pressed={!sidesSwitched}
-              onClick={() => patch({ sidesSwitched: false })}
+              className={matchDecided ? 'btn' : 'btn btn-primary'}
+              disabled={!ready}
+              onClick={start}
             >
-              As set 1
-            </button>
-            <button aria-pressed={sidesSwitched} onClick={() => patch({ sidesSwitched: true })}>
-              Switched
+              Start set
             </button>
           </div>
-        </div>
-      </div>
+        </header>
 
-      {showProblems && !complete && (
-        <div className="card problems" role="alert">
-          <b>The set cannot start yet</b>
-          <ul>
-            {problems.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <p className="faint requirement">
-        Lineups are entered by serve order, not court position. Slot I serves first.
-      </p>
-
-      <div className="team-grid">
-        {(['home', 'visitor'] as TeamSide[]).map((side) => (
-          <LineupEditor
-            key={side}
-            side={side}
-            setup={setup}
-            lineup={lineups[side]}
-            liberos={liberos[side]}
-            onAssign={(slot, player) => assign(side, slot, player)}
-            onToggleLibero={(player) => toggleLibero(side, player)}
-            problemSlots={problemSlots[side]}
-            showProblems={showProblems}
+        <div className="controls">
+          <Segment
+            label="First serve"
+            options={SIDES.map((s) => ({ v: s, t: setup[s].name || s }))}
+            current={firstServe}
+            onPick={(v) => patch({ firstServe: v as TeamSide })}
           />
-        ))}
+          <Segment
+            label="Play to"
+            options={[
+              { v: '15', t: '15' },
+              { v: '25', t: '25' },
+            ]}
+            current={String(targetScore)}
+            onPick={(v) => patch({ targetScore: Number(v) })}
+          />
+          <Segment
+            label="Sides"
+            options={[
+              { v: 'same', t: 'As set 1' },
+              { v: 'switched', t: 'Switched' },
+            ]}
+            current={sidesSwitched ? 'switched' : 'same'}
+            onPick={(v) => patch({ sidesSwitched: v === 'switched' })}
+          />
+        </div>
+
+        <main className="cards">{SIDES.map(renderCard)}</main>
       </div>
     </div>
   )

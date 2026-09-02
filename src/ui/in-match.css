@@ -46,15 +46,15 @@
   --scrim:          rgba(22, 22, 26, 0.38);
 }
 
-/* The reference sets these on html/body. Scoped to the in-match route so the
-   other screens keep their own background until they are ported too. */
-body.in-match-host {
+/* The reference sets these on html/body. Applied only while a stage screen is
+   mounted, so the screens not yet ported keep their own background. */
+body.stage-host {
   overflow: hidden;
   background: var(--app-bg);
   font-family: var(--font-sans);
   touch-action: manipulation;
 }
-body.in-match-host #root { display: flex; }
+body.stage-host #root { display: flex; }
 
 /* 2. STAGE. Locks the app to iPad landscape proportions and centres it. */
 .stage {
@@ -101,7 +101,7 @@ body.in-match-host #root { display: flex; }
 }
 
 /* 3. CONTEXT RAIL */
-.app .rail {
+.app.in-match .rail {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -111,24 +111,24 @@ body.in-match-host #root { display: flex; }
   background: var(--rail-bg);
   border-bottom: 1px solid var(--border);
 }
-.app .rail-left, .app .rail-right { display: flex; align-items: center; gap: var(--s3); }
-.app .rail-level {
+.app.in-match .rail-left, .app.in-match .rail-right { display: flex; align-items: center; gap: var(--s3); }
+.app.in-match .rail-level {
   font-size: var(--type-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.app .rail-sets  { font-size: var(--type-label); color: var(--text-secondary); }
-.app .rail-clock { font-size: var(--type-label); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.app.in-match .rail-sets  { font-size: var(--type-label); color: var(--text-secondary); }
+.app.in-match .rail-clock { font-size: var(--type-label); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 /* Set complete is a STATE, announced without seizing the screen. The court
    stays live and undo stays reachable, because only the R1 can end a set. */
-.app .rail-status { font-size: var(--type-label); color: var(--flag-amber); }
-.app .rail-status[hidden] { display: none; }
-.app .rail-icon  { color: var(--text-muted); display: flex; }
-.app .rail-icon svg { width: 2.1cqh; height: 2.1cqh; }
+.app.in-match .rail-status { font-size: var(--type-label); color: var(--flag-amber); }
+.app.in-match .rail-status[hidden] { display: none; }
+.app.in-match .rail-icon  { color: var(--text-muted); display: flex; }
+.app.in-match .rail-icon svg { width: 2.1cqh; height: 2.1cqh; }
 
 /* 4. COURT AREA */
-.app .court-area {
+.app.in-match .court-area {
   flex: 1 1 auto;
   display: flex;
   align-items: stretch;
@@ -137,7 +137,7 @@ body.in-match-host #root { display: flex; }
   min-height: 0;
 }
 
-.app .panel {
+.app.in-match .panel {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
@@ -148,18 +148,18 @@ body.in-match-host #root { display: flex; }
 }
 
 /* Team name stays outboard-left on BOTH sides. Only the body mirrors. */
-.app .panel-head {
+.app.in-match .panel-head {
   flex: 0 0 auto;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s3);
 }
-.app .panel-name { font-size: var(--type-team); font-weight: 600; }
-.app .panel-sets { font-size: var(--type-label); }
+.app.in-match .panel-name { font-size: var(--type-team); font-weight: 600; }
+.app.in-match .panel-sets { font-size: var(--type-label); }
 
 /* Score outboard, court inboard, so the two front rows face each other. */
-.app .panel-body {
+.app.in-match .panel-body {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
@@ -167,12 +167,12 @@ body.in-match-host #root { display: flex; }
   gap: var(--s3);
   min-height: 0;
 }
-.app .panel[data-side='visitor'] .panel-body  { flex-direction: row-reverse; }
-.app .panel[data-side='visitor'] .score-block { align-items: flex-end; }
-.app .panel[data-side='visitor'] .serve-line  { flex-direction: row-reverse; }
+.app.in-match .panel[data-side='visitor'] .panel-body  { flex-direction: row-reverse; }
+.app.in-match .panel[data-side='visitor'] .score-block { align-items: flex-end; }
+.app.in-match .panel[data-side='visitor'] .serve-line  { flex-direction: row-reverse; }
 
 /* --- the score IS the button --- */
-.app .score-block {
+.app.in-match .score-block {
   flex: 1 1 auto;
   min-width: 0;
   align-self: stretch;
@@ -188,31 +188,31 @@ body.in-match-host #root { display: flex; }
   font-family: inherit;
   text-align: inherit;
 }
-.app .score-block:active { background: rgba(127, 127, 127, 0.14); }
-.app .score-value {
+.app.in-match .score-block:active { background: rgba(127, 127, 127, 0.14); }
+.app.in-match .score-value {
   font-size: var(--type-score);
   line-height: 0.84;
   letter-spacing: -0.045em;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.app .serve-line {
+.app.in-match .serve-line {
   display: flex;
   align-items: center;
   gap: var(--s1);
   margin-top: var(--s2);
   font-size: var(--type-body);
 }
-.app .serve-line svg { width: 2.5cqh; height: 2.5cqh; }
+.app.in-match .serve-line svg { width: 2.5cqh; height: 2.5cqh; }
 
 /* --- court grid --- */
-.app .court {
+.app.in-match .court {
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(2, 19cqh);
   gap: 0.9cqh;
 }
-.app .cell {
+.app.in-match .cell {
   height: 18.4cqh;
   border-radius: var(--radius-cell);
   padding: 1cqh 1.4cqh;
@@ -228,15 +228,15 @@ body.in-match-host #root { display: flex; }
 /* A warning is a persistent mark on the thing that is wrong, never a
    message. It stays until the condition clears. It has to be loud enough to
    be FOUND without hunting: a hairline outline reads as decoration. */
-.app .cell.warn { outline: 3px solid var(--flag-amber); outline-offset: -3px; }
-.app .cell-flag {
+.app.in-match .cell.warn { outline: 3px solid var(--flag-amber); outline-offset: -3px; }
+.app.in-match .cell-flag {
   width: 1.4cqh; height: 1.4cqh;
   border-radius: 50%;
   background: var(--flag-amber);
   flex: 0 0 auto;
 }
 /* Second level of the find path: the panel says which team to look at. */
-.app .head-flag {
+.app.in-match .head-flag {
   width: 1.3cqh; height: 1.3cqh;
   border-radius: 50%;
   background: var(--flag-amber);
@@ -244,13 +244,13 @@ body.in-match-host #root { display: flex; }
   margin-left: 0.8cqh;
   vertical-align: middle;
 }
-.app .cell-top    { display: flex; align-items: center; gap: 0.5cqh; font-size: var(--type-cell-label); }
-.app .cell-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6cqh; }
-.app .cell-number { font-size: var(--type-cell); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
-.app .cell-history { font-size: var(--type-cell-hist); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.app.in-match .cell-top    { display: flex; align-items: center; gap: 0.5cqh; font-size: var(--type-cell-label); }
+.app.in-match .cell-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6cqh; }
+.app.in-match .cell-number { font-size: var(--type-cell); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
+.app.in-match .cell-history { font-size: var(--type-cell-hist); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* --- roster row: fixed slots, nine across --- */
-.app .roster {
+.app.in-match .roster {
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(9, 1fr);
@@ -259,7 +259,7 @@ body.in-match-host #root { display: flex; }
 }
 /* The roster reads left to right on BOTH sides. Only the score, court, and
    action bar mirror; mirroring the reading order costs more than it gains. */
-.app .chip {
+.app.in-match .chip {
   height: 5cqh;
   border-radius: var(--radius-chip);
   border: 1.5px solid transparent;
@@ -274,12 +274,12 @@ body.in-match-host #root { display: flex; }
   font-family: inherit;
   padding: 0;
 }
-.app .chip-slot { font-size: max(11px, 1.85cqh); align-self: flex-end; margin-bottom: 0.6cqh; }
-.app .chip[data-state='oncourt']    { background: transparent; cursor: default; }
-.app .chip[data-state='ineligible'] { opacity: 0.28; cursor: default; }
+.app.in-match .chip-slot { font-size: max(11px, 1.85cqh); align-self: flex-end; margin-bottom: 0.6cqh; }
+.app.in-match .chip[data-state='oncourt']    { background: transparent; cursor: default; }
+.app.in-match .chip[data-state='ineligible'] { opacity: 0.28; cursor: default; }
 
 /* --- substitution budget --- */
-.app .subs {
+.app.in-match .subs {
   flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
@@ -287,10 +287,10 @@ body.in-match-host #root { display: flex; }
   padding-top: var(--s1);
   border-top: 1px solid;
 }
-.app .sub-n { font-size: var(--type-micro); font-variant-numeric: tabular-nums; }
+.app.in-match .sub-n { font-size: var(--type-micro); font-variant-numeric: tabular-nums; }
 
 /* 5. CENTRE DIVIDER */
-.app .divider {
+.app.in-match .divider {
   flex: 0 0 7cqh;
   display: flex;
   flex-direction: column;
@@ -298,18 +298,18 @@ body.in-match-host #root { display: flex; }
   justify-content: center;
   gap: var(--s2);
 }
-.app .divider-label {
+.app.in-match .divider-label {
   font-size: var(--type-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.app .divider-set   { font-size: 5cqh; line-height: 1; color: var(--text-primary); font-weight: 600; }
-.app .divider-rule  { width: 1px; height: 7cqh; background: var(--border); }
-.app .divider-match { font-size: var(--type-label); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.app.in-match .divider-set   { font-size: 5cqh; line-height: 1; color: var(--text-primary); font-weight: 600; }
+.app.in-match .divider-rule  { width: 1px; height: 7cqh; background: var(--border); }
+.app.in-match .divider-match { font-size: var(--type-label); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
 /* 6. ACTION BAR. Spatially mirrored: home left, visitor right, shared centre. */
-.app .bar {
+.app.in-match .bar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -318,11 +318,11 @@ body.in-match-host #root { display: flex; }
   background: var(--rail-bg);
   border-top: 1px solid var(--border);
 }
-.app .bar-group { display: flex; gap: var(--s1); flex: 1 1 0; }
-.app .bar-group.right  { justify-content: flex-end; }
-.app .bar-group.centre { flex: 0 0 auto; }
+.app.in-match .bar-group { display: flex; gap: var(--s1); flex: 1 1 0; }
+.app.in-match .bar-group.right  { justify-content: flex-end; }
+.app.in-match .bar-group.centre { flex: 0 0 auto; }
 
-.app .btn {
+.app.in-match .btn {
   display: inline-flex;
   align-items: center;
   gap: 0.8cqh;
@@ -339,18 +339,18 @@ body.in-match-host #root { display: flex; }
   white-space: nowrap;
   transition: background-color 120ms ease;
 }
-.app .btn svg { width: 2.1cqh; height: 2.1cqh; }
-.app .btn:active { background: var(--control-hover); }
-.app .btn:disabled { opacity: 0.35; cursor: default; }
+.app.in-match .btn svg { width: 2.1cqh; height: 2.1cqh; }
+.app.in-match .btn:active { background: var(--control-hover); }
+.app.in-match .btn:disabled { opacity: 0.35; cursor: default; }
 /* Primary: the one filled control. Setup and confirmation actions only. */
-.app .btn-primary {
+.app.in-match .btn-primary {
   background: var(--text-primary);
   border-color: var(--text-primary);
   color: var(--app-bg);
 }
-.app .btn-primary:active { background: var(--text-secondary); border-color: var(--text-secondary); }
-.app .btn[hidden] { display: none; }
-.app .btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.app.in-match .btn-primary:active { background: var(--text-secondary); border-color: var(--text-secondary); }
+.app.in-match .btn[hidden] { display: none; }
+.app.in-match .btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
 /* ---------------------------------------------------------------------------
    7. OVERLAYS
@@ -358,15 +358,15 @@ body.in-match-host #root { display: flex; }
    mid-match is allowed to displace the court, because a tap target that moves
    is a mis-recorded rally.
    --------------------------------------------------------------------------- */
-.app .scrim {
+.app.in-match .scrim {
   position: absolute;
   inset: 0;
   background: var(--scrim);
   z-index: 20;
 }
-.app .scrim[hidden] { display: none; }
+.app.in-match .scrim[hidden] { display: none; }
 
-.app .sheet {
+.app.in-match .sheet {
   position: absolute;
   z-index: 21;
   min-width: var(--sheet-min);
@@ -379,18 +379,18 @@ body.in-match-host #root { display: flex; }
   font-size: var(--type-label);
   line-height: 1.6;
 }
-.app .sheet[hidden] { display: none; }
+.app.in-match .sheet[hidden] { display: none; }
 
 /* A sheet anchors to the SIDE of the thing it acts on. The screen is already
    mirrored, so a sheet that ignores that makes you re-read its title to work
    out which team you are affecting. */
-.app .sheet-left   { left:  var(--s4); bottom: 11cqh; }
-.app .sheet-right  { right: var(--s4); bottom: 11cqh; }
-.app .sheet-centre { left: 50%; transform: translateX(-50%); bottom: 11cqh; }
+.app.in-match .sheet-left   { left:  var(--s4); bottom: 11cqh; }
+.app.in-match .sheet-right  { right: var(--s4); bottom: 11cqh; }
+.app.in-match .sheet-centre { left: 50%; transform: translateX(-50%); bottom: 11cqh; }
 
-.app .sheet-title { color: var(--text-primary); font-size: var(--type-body); margin-bottom: var(--s2); }
-.app .sheet-row { display: flex; gap: var(--s1); align-items: center; }
-.app .field {
+.app.in-match .sheet-title { color: var(--text-primary); font-size: var(--type-body); margin-bottom: var(--s2); }
+.app.in-match .sheet-row { display: flex; gap: var(--s1); align-items: center; }
+.app.in-match .field {
   flex: 1 1 auto; min-width: 0;
   padding: 1.2cqh 1.6cqh;
   border: 1.5px solid var(--border-strong);
@@ -400,18 +400,18 @@ body.in-match-host #root { display: flex; }
   font-family: inherit;
   font-size: var(--type-body);
 }
-.app .field::placeholder { color: var(--text-muted); }
-.app .sheet-menu { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
-.app .sheet-menu .btn { justify-content: flex-start; }
+.app.in-match .field::placeholder { color: var(--text-muted); }
+.app.in-match .sheet-menu { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
+.app.in-match .sheet-menu .btn { justify-content: flex-start; }
 
 @media (prefers-reduced-motion: reduce) { .app * { transition: none !important; } }
 
 /* The reference copy of any active warning, read when there is a moment. */
-.app .sheet-warnings {
+.app.in-match .sheet-warnings {
   margin-top: 1.5cqh;
   padding-top: 1.5cqh;
   border-top: 1px solid var(--border);
   color: var(--flag-amber);
 }
 /* Jersey numbers are short; a name is not. */
-.app .field-number { flex: 0 0 16cqh; }
+.app.in-match .field-number { flex: 0 0 16cqh; }

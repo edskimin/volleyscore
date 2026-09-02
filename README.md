@@ -40,6 +40,22 @@ Do not introduce mutable current-state storage as an optimization.
 - [`refeerence/in-match.html`](docs/refeerence/in-match.html) — the approved in-match
   screen, working. **The source of truth for that screen.** Open it in a browser.
 
+## Set setup is a port too
+
+`src/ui/SetSetup.tsx` and `src/ui/set-setup.css` come from
+[`refeerence/set-setup.html`](docs/refeerence/set-setup.html). Two rules it encodes:
+
+**Enter data in the shape of its source; verify it in the shape of reality.** Serve
+order is entered as a linear I–VI list, because that is the shape of the lineup sheet
+being transcribed. The resulting court is shown live beside it, because that is the
+shape of the players on the floor, and comparing the two is what catches a
+transcription error. The preview is a check, not an input, and it is derived by the
+reducer's own `initialPosition`, so what it shows is exactly what `SET_STARTED` will
+produce.
+
+**Make the common path the shortest one.** Six chip taps in serve order fill I–VI by
+auto-advance. Tapping a slot is correction only.
+
 ## The in-match screen is a port
 
 `src/ui/InMatch.tsx`, `src/ui/in-match.css` and `src/ui/palette.ts` are ported from the
@@ -107,7 +123,9 @@ npm run dev
 npm test
 ```
 
-`scripts/probe.js` holds three browser probes for the in-match screen: `layoutProbe()`
+`scripts/probe.js` holds the browser probes. `previewProbe()` asserts set setup's court
+preview equals `positionOf` for both the serving and the receiving team, read off the
+DOM rather than from the code. For the in-match screen, `layoutProbe()`
 asserts no overlay displaces the court, `anchorProbe()` asserts a team-scoped sheet
 opens on that team's side, and `colorProbe()` asserts nothing renders a
 color outside the chrome tokens, the derived team shades and `--flag-amber`, and that

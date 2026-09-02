@@ -172,13 +172,16 @@ export default function App() {
         draft?.setNumber === setNumber
           ? draft
           : setDefaults(record.setup, priorSets, setNumber)
+      // No .app-root wrapper: this screen supplies its own .stage/.app.
       return (
-        <div className="app-root">
+        <>
           <SetSetupScreen
             setup={record.setup}
             setsWon={state.setsWon}
             draft={active}
             onDraftChange={setDraft}
+            theme={theme}
+            onToggleTheme={toggleTheme}
             onBack={() => setRoute('home')}
             onEditSetup={() => setRoute('editSetup')}
             onSheet={() => {
@@ -193,7 +196,7 @@ export default function App() {
               setRoute('inMatch')
             }}
           />
-        </div>
+        </>
       )
     }
 

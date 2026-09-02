@@ -3,6 +3,7 @@
  *
  *   layoutProbe()  asserts no overlay displaces the court
  *   anchorProbe()  asserts a team-scoped sheet opens on that team's side
+ *   previewProbe() asserts set setup's court preview equals positionOf, both sides
  *   colorProbe()   asserts nothing renders a color outside the sanctioned set,
  *                  that every warning mark is amber and thick enough to find, and
  *                  that no layer holds more than one primary button
@@ -202,4 +203,46 @@ async function anchorProbe() {
     void open
   }
   return { results, pass: results.every((r) => r.ok) }
+}
+
+
+/* SET SETUP: the court preview must equal positionOf for BOTH the serving and the
+   receiving team. That derivation is the piece most likely to be subtly wrong and
+   least likely to be noticed: a wrong preview validates a wrong lineup, and the
+   preview is the whole verification step. Read straight off the DOM, so it checks
+   what is rendered rather than what the code intends. */
+function previewProbe() {
+  const RN = ['I', 'II', 'III', 'IV', 'V', 'VI']
+  const GRID = { home: [5, 4, 6, 3, 1, 2], visitor: [2, 1, 3, 6, 4, 5] }
+  const positionOf = (serves, slotIndex) => (serves ? slotIndex + 1 : ((slotIndex + 1) % 6) + 1)
+
+  const firstServe = [...document.querySelectorAll('.controls .control')]
+    .find((c) => /first serve/i.test(c.textContent))
+    ?.querySelector('button[aria-pressed="true"]')?.textContent.trim()
+
+  const rows = []
+  for (const card of document.querySelectorAll('.card[data-side]')) {
+    const side = card.dataset.side
+    const serves = (setup[side]?.name ?? '') === firstServe
+    const lineup = [...card.querySelectorAll('.order .slot')].map((s) => {
+      const n = s.querySelector('.slot-num')
+      return n ? n.textContent.trim() : null
+    })
+    const cells = [...card.querySelectorAll('.court .pcell')]
+    GRID[side].forEach((pos, i) => {
+      // Which serve-order slot should stand at this court position?
+      let expectIdx = -1
+      for (let k = 0; k < 6; k++) if (positionOf(serves, k) === pos) expectIdx = k
+      const shownRn = cells[i].querySelector('.pcell-rn').textContent.trim()
+      const shownNum = cells[i].querySelector('.pcell-num').textContent.trim()
+      const expectNum = lineup[expectIdx] ?? '—'
+      rows.push({
+        side, pos, serves,
+        expectRn: RN[expectIdx], shownRn,
+        expectNum, shownNum,
+        ok: shownRn === RN[expectIdx] && shownNum === expectNum,
+      })
+    })
+  }
+  return { checks: rows.length, failures: rows.filter((r) => !r.ok), pass: rows.every((r) => r.ok) }
 }

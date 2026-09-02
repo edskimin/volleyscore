@@ -117,11 +117,11 @@ button {
 .app-root .field input:focus,
 .app-root .field select:focus { outline: 2px solid var(--line-strong); outline-offset: -1px; }
 
-.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px; gap: 3px; }
-.seg button { padding: 0.45rem 0.85rem; border-radius: 9px; font-size: 0.88rem; color: var(--fg-dim); }
-.seg button[aria-pressed='true'] { background: var(--surface-3); color: var(--fg); font-weight: 600; }
+.app-root .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px; gap: 3px; }
+.app-root .seg button { padding: 0.45rem 0.85rem; border-radius: 9px; font-size: 0.88rem; color: var(--fg-dim); }
+.app-root .seg button[aria-pressed='true'] { background: var(--surface-3); color: var(--fg); font-weight: 600; }
 
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--pad); }
+.app-root .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--pad); }
 
 .muted { color: var(--fg-dim); }
 .faint { color: var(--fg-faint); }
@@ -285,7 +285,7 @@ button {
 .lineup-editor > header b { font-size: 1rem; font-weight: 600; }
 
 .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
-.slot {
+.app-root .slot {
   display: grid;
   gap: 0.1rem;
   padding: 0.55rem 0.5rem;
@@ -296,11 +296,11 @@ button {
   min-height: 62px;
   align-content: start;
 }
-.slot em { font-style: normal; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--fg-faint); font-weight: 700; }
-.slot b { font-size: 1.35rem; font-weight: 700; line-height: 1.1; }
-.slot i { font-style: normal; font-size: 0.58rem; color: var(--fg-faint); letter-spacing: 0.05em; }
-.slot.filled { background: var(--surface-3); }
-.slot.selected { outline: 2px solid var(--fg); outline-offset: -2px; background: var(--surface-3); }
+.app-root .slot em { font-style: normal; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--fg-faint); font-weight: 700; }
+.app-root .slot b { font-size: 1.35rem; font-weight: 700; line-height: 1.1; }
+.app-root .slot i { font-style: normal; font-size: 0.58rem; color: var(--fg-faint); letter-spacing: 0.05em; }
+.app-root .slot.filled { background: var(--surface-3); }
+.app-root .slot.selected { outline: 2px solid var(--fg); outline-offset: -2px; background: var(--surface-3); }
 
 .picker { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .app-root .chip {
@@ -321,8 +321,8 @@ button {
 .app-root .chip.used { border-color: transparent; }
 .app-root .chip.on { background: var(--fg); color: var(--bg); border-color: transparent; }
 
-.libero-row { display: flex; align-items: center; gap: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--line); }
-.libero-row .eyebrow { margin-right: auto; }
+.app-root .libero-row { display: flex; align-items: center; gap: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--line); }
+.app-root .libero-row .eyebrow { margin-right: auto; }
 
 /* --- Closeout ----------------------------------------------------------- */
 
@@ -374,11 +374,11 @@ button {
 
 .closeout-actions { display: flex; align-items: center; gap: 0.8rem; padding-bottom: 1rem; }
 .closeout-actions .faint { font-size: 0.83rem; }
-.badge.warn { background: transparent; color: var(--flag-amber); border: 1px solid var(--flag-amber); }
+.app-root .badge.warn { background: transparent; color: var(--flag-amber); border: 1px solid var(--flag-amber); }
 .badge.quiet { background: var(--surface-3); color: var(--fg-dim); }
 
 .storage-error { max-width: 620px; margin: 0 auto; width: 100%; justify-content: center; }
-.storage-error .card { display: grid; gap: 0.7rem; }
+.app-root .storage-error .card { display: grid; gap: 0.7rem; }
 .storage-error h1 { margin: 0; font-size: 1.1rem; font-weight: 650; }
 .storage-error p { margin: 0; font-size: 0.88rem; }
 .storage-error pre {
@@ -392,7 +392,7 @@ button {
   white-space: pre-wrap;
   overflow-x: auto;
 }
-.storage-error .btn { justify-self: start; }
+.app-root .storage-error .btn { justify-self: start; }
 
 /* --- Adjustment mode ----------------------------------------------------- */
 
@@ -403,12 +403,12 @@ button {
 .adjust-intro b { color: var(--fg); font-weight: 600; }
 .warn-line { color: var(--flag-amber) !important; }
 
-.slot.changed { outline: 1px solid var(--flag-amber); outline-offset: -1px; }
-.slot i { font-style: normal; font-size: 0.58rem; color: var(--flag-amber); letter-spacing: 0.04em; }
+.app-root .slot.changed { outline: 1px solid var(--flag-amber); outline-offset: -1px; }
+.app-root .slot i { font-style: normal; font-size: 0.58rem; color: var(--flag-amber); letter-spacing: 0.04em; }
 
 .serve-fix { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .confirm { display: grid; gap: 0.9rem; }
-.confirm .field input { width: 100%; }
+.app-root .confirm .field input { width: 100%; }
 .faint.small { font-size: 0.78rem; margin: 0; }
 
 .check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; color: var(--fg-dim); }
@@ -429,7 +429,7 @@ button {
 .problems b { font-size: 0.9rem; font-weight: 650; color: var(--flag-amber); }
 .problems ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; font-size: 0.87rem; color: var(--fg-dim); }
 
-.slot.problem { outline: 2px solid var(--flag-amber); outline-offset: -2px; }
+.app-root .slot.problem { outline: 2px solid var(--flag-amber); outline-offset: -2px; }
 .app-root .btn[aria-disabled='true'] { opacity: 0.45; }
 .sets td.sheet-link { text-align: right; padding: 0.2rem 0; }
-.sets td.sheet-link .btn { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+.app-root .sets td.sheet-link .btn { padding: 0.3rem 0.7rem; font-size: 0.8rem; }

@@ -1,0 +1,137 @@
+/* ---------------------------------------------------------------------------
+   SET SETUP
+   Ported from docs/refeerence/set-setup.html. Same stage, same tokens and same
+   state language as the in-match screen. Component selectors carry an
+   `.app.set-setup ` prefix so the two screens' stylesheets cannot reach each
+   other; the shared `.app` block in in-match.css supplies the stage.
+
+   TWO DECISIONS THIS SCREEN ENCODES
+   1. Serve order is entered as a linear I..VI list and the resulting court is
+      shown live BESIDE it. The list matches the lineup sheet being transcribed;
+      the court matches the players on the floor, and comparing the two is what
+      catches a transcription error. The preview is a check, not an input.
+   2. Entry is six taps, not twelve. Tapping a chip fills the active slot and
+      advances. Tapping a slot is CORRECTION only.
+   --------------------------------------------------------------------------- */
+
+.app.set-setup {
+  /* This screen's own type scale. --type-micro is smaller here than in-match. */
+  --type-team:  max(15px, 2.9cqh);
+  --type-slot:  max(20px, 3.6cqh);
+  --type-chip:  max(14px, 2.6cqh);
+  --type-body:  max(12px, 1.9cqh);
+  --type-label: max(11px, 1.7cqh);
+  --type-micro: max(11px, 1.5cqh);
+}
+
+/* ---- rail ---- */
+.app.set-setup .rail {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s4); padding: var(--s2) var(--s4);
+  background: var(--rail-bg); border-bottom: 1px solid var(--border);
+}
+.app.set-setup .rail-left, .app.set-setup .rail-right { display: flex; align-items: center; gap: var(--s3); }
+.app.set-setup .rail-title { font-size: var(--type-team); font-weight: 600; }
+.app.set-setup .rail-sub { font-size: var(--type-label); color: var(--text-secondary); }
+
+/* ---- match-level controls ---- */
+.app.set-setup .controls {
+  flex: 0 0 auto; display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s2) var(--s4); border-bottom: 1px solid var(--border);
+}
+.app.set-setup .control { display: flex; align-items: center; gap: var(--s2); }
+.app.set-setup .control-label {
+  font-size: var(--type-micro); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.app.set-setup .seg { display: flex; border: 1.5px solid var(--border-strong); border-radius: var(--radius-control); overflow: hidden; }
+.app.set-setup .seg button {
+  padding: 1cqh 1.8cqh; border: 0; background: transparent;
+  color: var(--control-text); font-family: inherit; font-size: var(--type-body); cursor: pointer;
+}
+.app.set-setup .seg button[aria-pressed='true'] { background: var(--text-primary); color: var(--app-bg); }
+
+/* ---- team cards ---- */
+.app.set-setup .cards { flex: 1 1 auto; display: flex; gap: var(--s3); padding: var(--s3) var(--s4); min-height: 0; }
+.app.set-setup .card {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+  background: var(--rail-bg); border: 1px solid var(--border);
+  border-radius: var(--radius-panel); padding: var(--s3);
+}
+/* Team colour is an accent here, never a fill: this is a data entry screen. */
+.app.set-setup .card-head { flex: 0 0 auto; padding-bottom: var(--s2); border-bottom: 2px solid; margin-bottom: var(--s3); }
+.app.set-setup .card-role {
+  font-size: var(--type-micro); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-right: var(--s2);
+}
+.app.set-setup .card-name { font-size: var(--type-team); font-weight: 600; }
+
+/* Serve order list beside the derived court. Mirrored per side so the two
+   courts sit adjacent, exactly as they do on the in-match screen. */
+.app.set-setup .card-body { flex: 0 0 auto; display: flex; gap: var(--s3); align-items: flex-start; }
+.app.set-setup .card[data-side='visitor'] .card-body { flex-direction: row-reverse; }
+.app.set-setup .card[data-side='visitor'] .card-head { text-align: right; }
+
+.app.set-setup .order { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.6cqh; }
+.app.set-setup .slot {
+  display: flex; align-items: baseline; gap: var(--s2);
+  padding: 0.8cqh 1.2cqh; height: 5.4cqh;
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius-cell);
+  cursor: pointer;
+  background: transparent; font-family: inherit; text-align: left; width: 100%;
+}
+.app.set-setup .slot[data-active='true'] { border-color: var(--text-primary); border-width: 2px; }
+.app.set-setup .slot-rn { font-size: var(--type-micro); color: var(--text-muted); width: 4.2cqh; flex: 0 0 auto; }
+.app.set-setup .slot-num { font-size: var(--type-slot); font-variant-numeric: tabular-nums; font-weight: 600; }
+.app.set-setup .slot-empty { font-size: var(--type-slot); color: var(--text-muted); }
+.app.set-setup .slot-first { font-size: var(--type-micro); color: var(--text-muted); margin-left: auto; }
+
+/* Derived court preview. Not editable: it is a check, not an input. */
+.app.set-setup .preview { flex: 0 0 auto; }
+.app.set-setup .preview-label {
+  font-size: var(--type-micro); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--s1);
+}
+.app.set-setup .court { display: grid; grid-template-columns: repeat(2, 9.5cqh); gap: 0.6cqh; }
+.app.set-setup .pcell {
+  height: 9.8cqh; border-radius: var(--radius-cell); padding: 0.6cqh 0.8cqh;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.app.set-setup .pcell-rn { font-size: var(--type-micro); }
+.app.set-setup .pcell-num { font-size: var(--type-slot); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Roster: fixed numeric order, nine across, reads left to right on BOTH sides. */
+.app.set-setup .roster-label { font-size: var(--type-micro); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin: var(--s3) 0 var(--s1); }
+.app.set-setup .roster { display: grid; grid-template-columns: repeat(9, 1fr); gap: 0.6cqh; }
+.app.set-setup .chip {
+  height: 5cqh; border-radius: var(--radius-chip);
+  border: 1.5px solid transparent; background: var(--control-hover);
+  display: flex; align-items: center; justify-content: center; gap: 0.3cqh;
+  font-size: var(--type-chip); font-variant-numeric: tabular-nums;
+  color: var(--text-primary); cursor: pointer;
+  font-family: inherit; padding: 0;
+}
+/* Same three states as in-match: outlined means in use and inert. */
+.app.set-setup .chip[data-state='placed'] { background: transparent; border-color: var(--border-strong); color: var(--text-muted); cursor: default; }
+.app.set-setup .libero-row { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+.app.set-setup .lchip {
+  height: 4.4cqh; padding: 0 1.4cqh; border-radius: var(--radius-chip);
+  border: 1.5px solid var(--border-strong); background: transparent;
+  display: inline-flex; align-items: center; gap: 0.5cqh;
+  font-size: var(--type-body); font-variant-numeric: tabular-nums;
+  color: var(--control-text); cursor: pointer; font-family: inherit;
+}
+.app.set-setup .lchip[aria-pressed='true'] { background: var(--text-primary); border-color: var(--text-primary); color: var(--app-bg); }
+
+.app.set-setup .btn {
+  display: inline-flex; align-items: center; gap: 0.8cqh;
+  padding: 1.2cqh 2cqh; border-radius: var(--radius-control);
+  border: 1.5px solid var(--border-strong); background: transparent;
+  color: var(--control-text); font-family: inherit; font-size: var(--type-body);
+  font-weight: 400; justify-content: flex-start;
+  cursor: pointer; white-space: nowrap;
+}
+.app.set-setup .btn:active { background: var(--control-hover); }
+.app.set-setup .btn:disabled { opacity: 0.35; cursor: default; }
+.app.set-setup .btn-primary { background: var(--text-primary); border-color: var(--text-primary); color: var(--app-bg); }
+.app.set-setup .btn-quiet { border-color: transparent; color: var(--text-muted); padding: 0.6cqh 1cqh; font-size: var(--type-micro); }

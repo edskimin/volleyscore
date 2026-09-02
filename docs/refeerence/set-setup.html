@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Volleyball Scorer: set setup reference</title>
+
+<!--
+  REFERENCE IMPLEMENTATION: SET SETUP
+  ==================================
+  Same stage, same tokens, same state language as reference/in-match.html.
+  Port it, don't reinterpret it.
+
+  TWO DECISIONS THIS SCREEN ENCODES
+  --------------------------------
+  1. Serve order is entered as a linear I..VI list, and the resulting court is
+     shown live BESIDE it. These are not alternatives.
+
+     The list matches the lineup sheet the coach hands you, so transcription
+     matches its source. The court matches the players standing on the floor,
+     which is the only thing that catches a transcription error. Court position
+     at set start is fully derived from serve order plus who serves first, so
+     the preview costs nothing and it IS the verification step.
+
+  2. Entry is six taps, not twelve. Tap six roster chips in serve order and
+     auto-advance fills I through VI. Tapping a slot is for CORRECTION only:
+     it makes that slot active so the next chip replaces it. Making slot
+     selection mandatory would double the taps on the second most used screen
+     in the app.
+
+  Set 2 and later open pre-filled with the previous set's lineup, so the common
+  case is zero taps and Start set.
+-->
+
+<style>
+:root {
+  --font-sans: ui-sans-serif, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --flag-amber: #E0952A;
+}
+[data-theme="dark"] {
+  --app-bg: #0B0B0F; --rail-bg: #101014; --border: #1E1E26; --border-strong: #30303A;
+  --text-primary: #F2F2F5; --text-secondary: #9A9AA4; --text-muted: #6E6E78;
+  --control-text: #B8B8C2; --control-hover: #1A1A21; --cell-active-bg: #FFFFFF;
+  --scrim: rgba(0,0,0,0.62);
+}
+[data-theme="light"] {
+  --app-bg: #EFEFF2; --rail-bg: #FFFFFF; --border: #E0E0E5; --border-strong: #C9C9D1;
+  --text-primary: #16161A; --text-secondary: #55555F; --text-muted: #85858F;
+  --control-text: #34343C; --control-hover: #E8E8ED; --cell-active-bg: #FFFFFF;
+  --scrim: rgba(22,22,26,0.38);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--app-bg); font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+}
+body { display: flex; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+
+/* Same stage as in-match: iPad landscape, 1180 by 820. */
+.stage {
+  width:  min(100vw, calc(100dvh * 1180 / 820));
+  height: min(100dvh, calc(100vw * 820 / 1180));
+  margin: auto;
+}
+.app {
+  height: 100%; container-type: size; position: relative;
+  display: flex; flex-direction: column;
+  background: var(--app-bg); color: var(--text-primary);
+  --s1: 0.5cqh; --s2: 1cqh; --s3: 1.5cqh; --s4: 2cqh;
+  --type-team:  max(15px, 2.9cqh);
+  --type-slot:  max(20px, 3.6cqh);
+  --type-chip:  max(14px, 2.6cqh);
+  --type-body:  max(12px, 1.9cqh);
+  --type-label: max(11px, 1.7cqh);
+  --type-micro: max(11px, 1.5cqh);
+  --radius-panel: 2cqh; --radius-cell: 1.2cqh; --radius-chip: 0.85cqh; --radius-control: 1.1cqh;
+}
+
+/* ---- rail ---- */
+.rail {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s4); padding: var(--s2) var(--s4);
+  background: var(--rail-bg); border-bottom: 1px solid var(--border);
+}
+.rail-left, .rail-right { display: flex; align-items: center; gap: var(--s3); }
+.rail-title { font-size: var(--type-team); font-weight: 600; }
+
+/* ---- match-level controls ---- */
+.controls {
+  flex: 0 0 auto; display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s2) var(--s4); border-bottom: 1px solid var(--border);
+}
+.control { display: flex; align-items: center; gap: var(--s2); }
+.control-label {
+  font-size: var(--type-micro); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.seg { display: flex; border: 1.5px solid var(--border-strong); border-radius: var(--radius-control); overflow: hidden; }
+.seg button {
+  padding: 1cqh 1.8cqh; border: 0; background: transparent;
+  color: var(--control-text); font-family: inherit; font-size: var(--type-body); cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--text-primary); color: var(--app-bg); }
+
+/* ---- team cards ---- */
+.cards { flex: 1 1 auto; display: flex; gap: var(--s3); padding: var(--s3) var(--s4); min-height: 0; }
+.card {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+  background: var(--rail-bg); border: 1px solid var(--border);
+  border-radius: var(--radius-panel); padding: var(--s3);
+}
+/* Team colour is an accent here, never a fill: this is a data entry screen. */
+.card-head { flex: 0 0 auto; padding-bottom: var(--s2); border-bottom: 2px solid; margin-bottom: var(--s3); }
+.card-role {
+  font-size: var(--type-micro); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-right: var(--s2);
+}
+.card-name { font-size: var(--type-team); font-weight: 600; }
+
+/* Serve order list beside the derived court. Mirrored per side so the two
+   courts sit adjacent, exactly as they do on the in-match screen. */
+.card-body { flex: 0 0 auto; display: flex; gap: var(--s3); align-items: flex-start; }
+.card[data-side="visitor"] .card-body { flex-direction: row-reverse; }
+.card[data-side="visitor"] .card-head { text-align: right; }
+
+.order { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.6cqh; }
+.slot {
+  display: flex; align-items: baseline; gap: var(--s2);
+  padding: 0.8cqh 1.2cqh; height: 5.4cqh;
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius-cell);
+  cursor: pointer;
+}
+.slot[data-active="true"] { border-color: var(--text-primary); border-width: 2px; }
+.slot-rn { font-size: var(--type-micro); color: var(--text-muted); width: 4.2cqh; flex: 0 0 auto; }
+.slot-num { font-size: var(--type-slot); font-variant-numeric: tabular-nums; font-weight: 600; }
+.slot-empty { font-size: var(--type-slot); color: var(--text-muted); }
+.slot-first { font-size: var(--type-micro); color: var(--text-muted); margin-left: auto; }
+
+/* Derived court preview. Not editable: it is a check, not an input. */
+.preview { flex: 0 0 auto; }
+.preview-label {
+  font-size: var(--type-micro); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--s1);
+}
+.court { display: grid; grid-template-columns: repeat(2, 9.5cqh); gap: 0.6cqh; }
+.pcell {
+  height: 9.8cqh; border-radius: var(--radius-cell); padding: 0.6cqh 0.8cqh;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.pcell-rn { font-size: var(--type-micro); }
+.pcell-num { font-size: var(--type-slot); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Roster: fixed numeric order, nine across, reads left to right on BOTH sides. */
+.roster-label { font-size: var(--type-micro); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin: var(--s3) 0 var(--s1); }
+.roster { display: grid; grid-template-columns: repeat(9, 1fr); gap: 0.6cqh; }
+.chip {
+  height: 5cqh; border-radius: var(--radius-chip);
+  border: 1.5px solid transparent; background: var(--control-hover);
+  display: flex; align-items: center; justify-content: center; gap: 0.3cqh;
+  font-size: var(--type-chip); font-variant-numeric: tabular-nums;
+  color: var(--text-primary); cursor: pointer;
+}
+/* Same three states as in-match: outlined means in use and inert. */
+.chip[data-state="placed"] { background: transparent; border-color: var(--border-strong); color: var(--text-muted); cursor: default; }
+.libero-row { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+.lchip {
+  height: 4.4cqh; padding: 0 1.4cqh; border-radius: var(--radius-chip);
+  border: 1.5px solid var(--border-strong); background: transparent;
+  display: inline-flex; align-items: center; gap: 0.5cqh;
+  font-size: var(--type-body); font-variant-numeric: tabular-nums;
+  color: var(--control-text); cursor: pointer;
+}
+.lchip[aria-pressed="true"] { background: var(--text-primary); border-color: var(--text-primary); color: var(--app-bg); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 0.8cqh;
+  padding: 1.2cqh 2cqh; border-radius: var(--radius-control);
+  border: 1.5px solid var(--border-strong); background: transparent;
+  color: var(--control-text); font-family: inherit; font-size: var(--type-body);
+  cursor: pointer; white-space: nowrap;
+}
+.btn:active { background: var(--control-hover); }
+.btn:disabled { opacity: 0.35; cursor: default; }
+.btn-primary { background: var(--text-primary); border-color: var(--text-primary); color: var(--app-bg); }
+.btn-quiet { border-color: transparent; color: var(--text-muted); padding: 0.6cqh 1cqh; font-size: var(--type-micro); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+
+<body>
+<div class="stage"><div class="app">
+
+  <header class="rail">
+    <div class="rail-left">
+      <button class="btn">Back</button>
+      <span class="rail-title" id="rail-title">Set 2</span>
+      <span style="font-size:var(--type-label);color:var(--text-secondary)" id="rail-sub"></span>
+    </div>
+    <div class="rail-right">
+      <button class="btn" id="theme-btn">Light</button>
+      <button class="btn btn-primary" id="start-btn">Start set</button>
+    </div>
+  </header>
+
+  <div class="controls" id="controls"></div>
+  <main class="cards">
+    <section class="card" data-side="home" id="card-home"></section>
+    <section class="card" data-side="visitor" id="card-visitor"></section>
+  </main>
+
+</div></div>
+
+<script>
+"use strict";
+/* Shared with in-match: one primary hex per team derives every shade. */
+function hexToHsl(hex){var r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255,
+mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,h=0,s=0,l=(mx+mn)/2;
+if(d){s=l>0.5?d/(2-mx-mn):d/(mx+mn);if(mx===r)h=((g-b)/d+(g<b?6:0));else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;h*=60;}
+return{h:h,s:s*100,l:l*100};}
+function hsl(h,s,l){return "hsl("+h.toFixed(1)+" "+Math.max(0,Math.min(100,s)).toFixed(1)+"% "+Math.max(0,Math.min(100,l)).toFixed(1)+"%)";}
+function relLum(hex){var c=[1,3,5].map(function(i){var v=parseInt(hex.slice(i,i+2),16)/255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);});
+return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2];}
+function derivePalette(hex, theme){
+  var c=hexToHsl(hex), pale=relLum(hex)>0.42;
+  return { base:hex,
+    cellFront: hsl(c.h,c.s,c.l+8), cellBack: hsl(c.h,c.s,c.l+4), rule: hsl(c.h,c.s,c.l+10),
+    ink: pale?"#14141A":"#FFFFFF",
+    inkMuted: pale?hsl(c.h,c.s*0.55,26):hsl(c.h,Math.min(c.s,42),c.l+46) };
+}
+
+var RN = ["I","II","III","IV","V","VI"];
+var S = {
+  theme: "dark",
+  setNumber: 2,
+  firstServe: "visitor",
+  target: 25,
+  sidesSwitched: false,
+  active: { home: 0, visitor: 0 },   /* which slot the next chip fills */
+  home: {
+    name: "Avon Lake", color: "#14284B",
+    roster: ["2","3","4","5","6","7","9","10","11","12","15","17","18","21","23","30"],
+    liberos: ["30","23"], liberoActive: ["30"],
+    lineup: ["12","7","21","2","15","9"]      /* prefilled from set 1 */
+  },
+  visitor: {
+    name: "Amherst", color: "#8C1D2C",
+    roster: ["1","3","5","6","8","9","11","13","14","17","20","22","24"],
+    liberos: ["24"], liberoActive: ["24"],
+    lineup: [null,null,null,null,null,null]   /* not yet entered */
+  }
+};
+
+/* Court position is DERIVED from serve order plus who serves first.
+   Serving team: slot N at position N. Receiving team: slot N at position N+1,
+   because they rotate once when they first win the serve. */
+function positionOf(side, slotIndex) {
+  var serves = S.firstServe === side;
+  return serves ? slotIndex + 1 : ((slotIndex + 1) % 6) + 1;
+}
+var GRID = { home: [5,4,6,3,1,2], visitor: [2,1,3,6,4,5] };
+var FRONT = [2,3,4];
+
+function nextEmpty(side, from) {
+  var l = S[side].lineup;
+  for (var i = 0; i < 6; i++) { var j = (from + i) % 6; if (!l[j]) return j; }
+  return from;
+}
+function complete(side) { return S[side].lineup.every(Boolean); }
+
+function triangle(color) {
+  return '<svg width="1em" height="0.88em" viewBox="0 0 20 18" style="font-size:0.75em" aria-hidden="true">' +
+         '<polygon points="10,1.5 18.5,16.5 1.5,16.5" fill="none" stroke="' + color + '" stroke-width="1.6"/></svg>';
+}
+
+function renderControls() {
+  function seg(label, opts, current, attr) {
+    return '<div class="control"><span class="control-label">' + label + '</span><div class="seg">' +
+      opts.map(function(o) {
+        return '<button ' + attr + '="' + o.v + '" aria-pressed="' + (o.v === current) + '">' + o.t + "</button>";
+      }).join("") + "</div></div>";
+  }
+  document.getElementById("controls").innerHTML =
+    seg("First serve", [{v:"home",t:S.home.name},{v:"visitor",t:S.visitor.name}], S.firstServe, "data-serve") +
+    seg("Play to", [{v:"15",t:"15"},{v:"25",t:"25"}], String(S.target), "data-target") +
+    seg("Sides", [{v:"same",t:"As set 1"},{v:"switched",t:"Switched"}], S.sidesSwitched ? "switched" : "same", "data-sides");
+}
+
+function renderCard(side) {
+  var t = S[side], p = derivePalette(t.color, S.theme), el = document.getElementById("card-" + side);
+
+  var slots = t.lineup.map(function(n, i) {
+    var act = S.active[side] === i;
+    var first = (S.firstServe === side && i === 0) ? '<span class="slot-first">first server</span>' : "";
+    var body = n ? '<span class="slot-num">' + n + "</span>"
+                 : '<span class="slot-empty">&mdash;</span>';
+    return '<div class="slot" data-slot="' + side + ":" + i + '" data-active="' + act + '">' +
+             '<span class="slot-rn">' + RN[i] + "</span>" + body + first + "</div>";
+  }).join("");
+
+  /* Derived court. Reading it against the floor is what catches a mis-tap. */
+  var cells = GRID[side].map(function(pos) {
+    var idx = -1;
+    for (var i = 0; i < 6; i++) if (positionOf(side, i) === pos) idx = i;
+    var n = t.lineup[idx];
+    var bg = FRONT.indexOf(pos) !== -1 ? p.cellFront : p.cellBack;
+    return '<div class="pcell" style="background:' + bg + '">' +
+             '<span class="pcell-rn" style="color:' + p.inkMuted + '">' + RN[idx] + "</span>" +
+             '<span class="pcell-num" style="color:' + (n ? p.ink : p.inkMuted) + '">' + (n || "&mdash;") + "</span>" +
+           "</div>";
+  }).join("");
+
+  var chips = t.roster.map(function(j) {
+    var placed = t.lineup.indexOf(j) !== -1;
+    var lib = t.liberos.indexOf(j) !== -1
+      ? triangle(placed ? "var(--text-muted)" : "var(--text-primary)") : "";
+    return '<div class="chip" data-chip="' + side + ":" + j + '" data-state="' + (placed ? "placed" : "free") + '">' +
+           lib + j + "</div>";
+  }).join("");
+
+  var liberos = t.liberos.map(function(j) {
+    return '<button class="lchip" data-lib="' + side + ":" + j + '" aria-pressed="' +
+           (t.liberoActive.indexOf(j) !== -1) + '">' + triangle("currentColor") + j + "</button>";
+  }).join("");
+
+  el.innerHTML =
+    '<div class="card-head" style="border-bottom-color:' + p.base + '">' +
+      '<span class="card-role">' + (side === "home" ? "Home" : "Visitor") + "</span>" +
+      '<span class="card-name">' + t.name + "</span>" +
+    "</div>" +
+    '<div class="card-body">' +
+      '<div class="order">' + slots + "</div>" +
+      '<div class="preview"><div class="preview-label">On court</div>' +
+        '<div class="court">' + cells + "</div></div>" +
+    "</div>" +
+    '<div class="roster-label">Tap in serve order' +
+      '<button class="btn btn-quiet" data-clear="' + side + '" style="margin-left:1cqh">Clear</button></div>' +
+    '<div class="roster">' + chips + "</div>" +
+    '<div class="libero-row"><span class="control-label">Libero this set</span>' + liberos + "</div>";
+}
+
+function render() {
+  renderControls();
+  renderCard("home");
+  renderCard("visitor");
+  document.getElementById("rail-title").textContent = "Set " + S.setNumber;
+  document.getElementById("rail-sub").textContent =
+    S.setNumber > 1 ? "Lineups carried over from set " + (S.setNumber - 1) + ". Change what moved." : "";
+  document.getElementById("start-btn").disabled = !(complete("home") && complete("visitor"));
+  bind();
+}
+
+function bind() {
+  document.querySelectorAll("[data-serve]").forEach(function(b) {
+    b.onclick = function() { S.firstServe = b.dataset.serve; render(); };
+  });
+  document.querySelectorAll("[data-target]").forEach(function(b) {
+    b.onclick = function() { S.target = +b.dataset.target; render(); };
+  });
+  document.querySelectorAll("[data-sides]").forEach(function(b) {
+    b.onclick = function() { S.sidesSwitched = b.dataset.sides === "switched"; render(); };
+  });
+
+  /* Slot tap is CORRECTION only: it moves the cursor, it does not enter. */
+  document.querySelectorAll("[data-slot]").forEach(function(el) {
+    el.onclick = function() {
+      var parts = el.dataset.slot.split(":");
+      S.active[parts[0]] = +parts[1];
+      render();
+    };
+  });
+
+  /* Chip tap is the primary path: fill the active slot, advance. Six taps. */
+  document.querySelectorAll("[data-chip]").forEach(function(el) {
+    el.onclick = function() {
+      if (el.dataset.state === "placed") return;
+      var parts = el.dataset.chip.split(":"), side = parts[0], j = parts[1], t = S[side];
+      var i = S.active[side];
+      t.lineup[i] = j;
+      S.active[side] = nextEmpty(side, i + 1);
+      render();
+    };
+  });
+
+  document.querySelectorAll("[data-clear]").forEach(function(el) {
+    el.onclick = function() {
+      var side = el.dataset.clear;
+      S[side].lineup = [null,null,null,null,null,null];
+      S.active[side] = 0;
+      render();
+    };
+  });
+
+  document.querySelectorAll("[data-lib]").forEach(function(el) {
+    el.onclick = function() {
+      var parts = el.dataset.lib.split(":"), t = S[parts[0]], j = parts[1];
+      var k = t.liberoActive.indexOf(j);
+      if (k === -1) t.liberoActive.push(j); else t.liberoActive.splice(k, 1);
+      render();
+    };
+  });
+}
+
+document.getElementById("theme-btn").onclick = function() {
+  S.theme = S.theme === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", S.theme);
+  this.textContent = S.theme === "dark" ? "Light" : "Dark";
+  render();
+};
+
+render();
+</script>
+</body>
+</html>

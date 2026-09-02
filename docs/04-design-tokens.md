@@ -235,6 +235,20 @@ Build these from the tokens above.
 
 These live on the same 1180 by 820 stage and use the same `cqh` sizing.
 
+**Set setup** now has its own reference at `reference/set-setup.html`. Two rules it
+encodes are worth stating generally:
+
+*Enter data in the shape of its source; verify it in the shape of reality.* Serve order
+is entered as a linear I through VI list because that is the shape of the lineup sheet
+being transcribed. The resulting court is shown live beside it because that is the
+shape of the players on the floor, and comparing the two is what catches a
+transcription error. These are not competing layouts; each matches a different physical
+artifact.
+
+*Make the common path the shortest one.* Tapping six roster chips in serve order fills
+I through VI by auto-advance. Selecting a slot is for correction only. Requiring a slot
+tap before every entry would double the taps on a screen used before every set.
+
 **Match setup and set setup.** Cards on `--rail-bg` with `--radius-panel`. Team
 sections use that team's color as a left edge accent or a header underline, not as a
 fill, because these screens are about data entry, not team identity. Lineup slots are
