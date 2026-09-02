@@ -152,6 +152,10 @@ body {
 }
 .rail-sets  { font-size: var(--type-label); color: var(--text-secondary); }
 .rail-clock { font-size: var(--type-label); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Set complete is a STATE, announced without seizing the screen. The court
+   stays live and undo stays reachable, because only the R1 can end a set. */
+.rail-status { font-size: var(--type-label); color: var(--flag-amber); }
+.rail-status[hidden] { display: none; }
 .rail-icon  { color: var(--text-muted); display: flex; }
 .rail-icon svg { width: 2.1cqh; height: 2.1cqh; }
 
@@ -248,6 +252,9 @@ body {
   cursor: pointer;
   transition: background-color 120ms ease, opacity 120ms ease;
 }
+/* A warning is a persistent mark on the thing that is wrong, never a
+   message. It stays until the condition clears. */
+.cell.warn { outline: 1.5px solid var(--flag-amber); outline-offset: -1.5px; }
 .cell-top    { display: flex; align-items: center; gap: 0.5cqh; font-size: var(--type-cell-label); }
 .cell-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6cqh; }
 .cell-number { font-size: var(--type-cell); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -346,6 +353,14 @@ body {
 .btn svg { width: 2.1cqh; height: 2.1cqh; }
 .btn:active { background: var(--control-hover); }
 .btn:disabled { opacity: 0.35; cursor: default; }
+/* Primary: the one filled control. Setup and confirmation actions only. */
+.btn-primary {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--app-bg);
+}
+.btn-primary:active { background: var(--text-secondary); border-color: var(--text-secondary); }
+.btn[hidden] { display: none; }
 .btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
 /* ---------------------------------------------------------------
@@ -392,8 +407,10 @@ body {
     <div class="rail-left">
       <span class="rail-level">Varsity</span>
       <span class="rail-sets">25&ndash;21 &middot; 22&ndash;25 &middot; in progress</span>
+      <span class="rail-status" id="rail-status" hidden></span>
     </div>
     <div class="rail-right">
+      <button class="btn btn-primary" id="end-set-btn" hidden style="padding:0.9cqh 1.6cqh">end set</button>
       <span class="rail-clock">18:42</span>
       <span class="rail-icon" title="Saved on this device" aria-label="Saved on this device">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h9l5 5v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 4v5h6"/><circle cx="12" cy="15" r="2"/></svg>
@@ -531,6 +548,7 @@ function makeTeam(cfg) {
 var S = {
   theme: "dark",
   setNumber: 3,
+  targetScore: 25,
   serveTeam: "home",
   selection: null,
   hintOpen: false,
@@ -600,6 +618,29 @@ function chipAllowed(team, j) {
   return origin === undefined || team.slots.indexOf(sel.value) === origin;
 }
 
+/* A set is complete when a team reaches the target with a two-point lead.
+   Derived, never stored. The app SURFACES this; it does not act on it. */
+function setWinner() {
+  var h = S.home.points, v = S.visitor.points, t = S.targetScore;
+  if (h >= t && h - v >= 2) return "home";
+  if (v >= t && v - h >= 2) return "visitor";
+  return null;
+}
+
+/* Active rule warnings. Each names the object it marks so the mark can be
+   rendered in place rather than announced. */
+function warnings() {
+  var out = [];
+  ["home","visitor"].forEach(function(side) {
+    var t = S[side];
+    if (t.subsUsed.length >= 18) out.push({ side: side, target: "subs", text: t.name + " has used all 18 substitutions" });
+    t.slots.forEach(function(sl) {
+      if (sl.warn) out.push({ side: side, target: "slot", slot: sl, text: sl.warn });
+    });
+  });
+  return out;
+}
+
 /* =================================================================
    RENDER
    ================================================================= */
@@ -636,11 +677,12 @@ function renderPanel(side) {
     var fg  = active ? p.onActive : p.ink;
     var sub = active ? p.inkFaint : p.inkMuted;
     var dim = cellAllowed(t, slot) ? "" : "opacity:.28;cursor:default;";
+    var warn = slot.warn ? " warn" : "";
     var lib = isLibero(t, slot.current) ? triangle("1em", sub) : "";
     var hist = slot.history.length
       ? '<span class="cell-history" style="color:' + sub + '">' + slot.history.join(" ") + "</span>"
       : "<span></span>";
-    return '<div class="cell" data-side="' + side + '" data-pos="' + pos + '" style="background:' + bg + ";" + dim + '">' +
+    return '<div class="cell' + warn + '" data-side="' + side + '" data-pos="' + pos + '" style="background:' + bg + ";" + dim + '">' +
              '<div class="cell-top" style="color:' + sub + '">' + slot.rn + lib + "</div>" +
              '<div class="cell-bottom"><span class="cell-number" style="color:' + fg + '">' + slot.current + "</span>" + hist + "</div>" +
            "</div>";
@@ -663,11 +705,14 @@ function renderPanel(side) {
            '" style="background:' + bg + ";color:" + fg + ";border-color:" + bd + '">' + lib + j + badge + "</div>";
   }).join("");
 
+  /* At 18 the whole row goes amber: the budget itself is the warning. */
+  var exhausted = t.subsUsed.length >= 18;
   var subs = "";
   for (var i = 0; i < 18; i++) {
     var u = t.subsUsed[i];
-    subs += '<span class="sub-n" style="color:' +
-            (u ? (u.exceptional ? "var(--flag-amber)" : p.ink) : p.rule) + '">' + (i + 1) + "</span>";
+    var c = exhausted ? "var(--flag-amber)"
+                      : (u ? (u.exceptional ? "var(--flag-amber)" : p.ink) : p.rule);
+    subs += '<span class="sub-n" style="color:' + c + '">' + (i + 1) + "</span>";
   }
 
   /* Third of three serve indications: panel tint, inverted cell, this line. */
@@ -704,6 +749,14 @@ function render() {
   document.getElementById("set-number").textContent = S.setNumber;
   document.getElementById("match-score").textContent = S.home.sets + "\u2013" + S.visitor.sets;
   document.getElementById("undo-btn").disabled = S.log.length === 0;
+  var w = setWinner();
+  var status = document.getElementById("rail-status"), endBtn = document.getElementById("end-set-btn");
+  status.hidden = !w; endBtn.hidden = !w;
+  if (w) {
+    status.textContent = S[w].name + " wins set " + S.setNumber + ", " +
+      Math.max(S.home.points, S.visitor.points) + "\u2013" + Math.min(S.home.points, S.visitor.points);
+  }
+
   var hint = document.getElementById("hint");
   hint.hidden = !S.hintOpen;
   document.getElementById("scrim").hidden = !S.hintOpen;
@@ -713,8 +766,18 @@ function render() {
     "a player on court then her replacement. A player who has already been on this set can only return " +
     "to her own serve-order slot, shown on her chip, so other spots dim out. Dimmed means not tappable; " +
     "use Fix lineup to override. Liberos are marked with a triangle and can only enter the back row. " +
-    "Libero replacements do not count against the 18.";
+    "Libero replacements do not count against the 18." +
+    warningsBlock();
   bind();
+}
+
+/* Warnings are marked in place on the court and the sub row. This block is
+   the reference copy, read when the operator has a moment, never an alert. */
+function warningsBlock() {
+  var w = warnings();
+  if (!w.length) return "";
+  return '<div style="margin-top:1.2cqh;padding-top:1.2cqh;border-top:1px solid var(--border);color:var(--flag-amber)">' +
+         w.map(function(x) { return x.text; }).join("<br>") + "</div>";
 }
 
 /* =================================================================

@@ -105,9 +105,8 @@ export default function InMatch(props: Props) {
   const { setup, state, events, append, undoLast, canUndo, theme } = props
   const [sel, setSel] = useState<Selection>(null)
   /** One overlay at a time. Null means the court is unobstructed. */
-  type Overlay = 'menu' | 'hint' | 'set-end' | 'match-end' | 'add-home' | 'add-visitor'
-  const [opened, setOpened] = useState<Overlay | null>(null)
-  const [dismissedEnd, setDismissedEnd] = useState<string | null>(null)
+  type Overlay = 'menu' | 'hint' | 'add-home' | 'add-visitor'
+  const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [newNumber, setNewNumber] = useState('')
 
   const [clock, setClock] = useState(() => new Date().toTimeString().slice(0, 5))
@@ -159,36 +158,38 @@ export default function InMatch(props: Props) {
   const matchWinner: TeamSide = state.setsWon.home > state.setsWon.visitor ? 'home' : 'visitor'
   const matchEnded = events.some((e) => e.type === 'MATCH_ENDED')
 
-  // A finished set or match raises its own prompt, but "Not yet" has to stick. The
-  // token changes when the situation does, so undoing and re-reaching set point asks
-  // again rather than staying silent.
-  const endToken = `${state.currentSet}:${state.score.home}:${state.score.visitor}`
-  const autoEnd: Overlay | null =
-    state.matchComplete && !matchEnded
-      ? 'match-end'
-      : state.setComplete && state.setInProgress
-        ? 'set-end'
-        : null
-  const overlay: Overlay | null =
-    opened ?? (autoEnd && dismissedEnd !== endToken ? autoEnd : null)
+  // A derived conclusion is announced, never enforced. The app can compute that a set
+  // is over; only the first referee can decide it. So this is a status line and one
+  // primary control, with the court live and undo reachable throughout.
+  const setWinner: TeamSide | null =
+    state.setComplete && state.setInProgress
+      ? state.score.home > state.score.visitor
+        ? 'home'
+        : 'visitor'
+      : null
+  const matchOver = state.matchComplete && !matchEnded
 
-  function setOverlay(next: Overlay | null | ((v: Overlay | null) => Overlay | null)) {
-    const value = typeof next === 'function' ? next(overlay) : next
-    setOpened(value)
-    // Closing also silences the automatic prompt for this exact situation.
-    if (value === null && autoEnd) setDismissedEnd(endToken)
+  let status: string | null = null
+  if (matchOver) {
+    status =
+      `${setup[matchWinner].name} wins the match, ` +
+      `${Math.max(state.setsWon.home, state.setsWon.visitor)}\u2013` +
+      `${Math.min(state.setsWon.home, state.setsWon.visitor)}`
+  } else if (setWinner) {
+    status =
+      `${setup[setWinner].name} wins set ${state.currentSet}, ` +
+      `${Math.max(state.score.home, state.score.visitor)}\u2013` +
+      `${Math.min(state.score.home, state.score.visitor)}`
   }
 
-  // Scrim tap and Escape both dismiss. Declared after the derivations it reads.
+  // Scrim tap and Escape both dismiss.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      setOpened(null)
-      if (autoEnd) setDismissedEnd(endToken)
+      if (e.key === 'Escape') setOverlay(null)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [autoEnd, endToken])
+  }, [])
 
   const adding: TeamSide | null =
     overlay === 'add-home' ? 'home' : overlay === 'add-visitor' ? 'visitor' : null
@@ -203,6 +204,11 @@ export default function InMatch(props: Props) {
     const selChip = sel?.kind === 'chip' && sel.side === side ? sel.value : null
     const onCourtNumbers = new Set(t.slots.map((s) => s.current))
     const isLibero = (j: string) => t.liberoDesignated.includes(j)
+    // A warning marks the object that is wrong and stays until the condition clears.
+    const warned = new Set(
+      state.warnings.filter((w) => w.side === side && w.target === 'slot').map((w) => w.slot),
+    )
+    const budgetSpent = state.warnings.some((w) => w.side === side && w.target === 'subs')
 
     const cells = GRID[side].map((pos) => {
       const idx = t.slots.findIndex((s) => s.position === pos) as SlotIndex
@@ -222,7 +228,7 @@ export default function InMatch(props: Props) {
       return (
         <button
           key={pos}
-          className="cell"
+          className={warned.has(idx) ? 'cell warn' : 'cell'}
           style={{
             background: bg,
             ...(blocked ? { opacity: 0.28, cursor: 'default' } : null),
@@ -292,12 +298,15 @@ export default function InMatch(props: Props) {
 
     const subs = Array.from({ length: MAX_SUBS }, (_, i) => {
       const u = t.subsUsed[i]
+      const color = budgetSpent
+        ? 'var(--flag-amber)'
+        : u
+          ? u.exceptional
+            ? 'var(--flag-amber)'
+            : p.ink
+          : p.rule
       return (
-        <span
-          key={i}
-          className="sub-n"
-          style={{ color: u ? (u.exceptional ? 'var(--flag-amber)' : p.ink) : p.rule }}
-        >
+        <span key={i} className="sub-n" style={{ color }}>
           {i + 1}
         </span>
       )
@@ -354,13 +363,28 @@ export default function InMatch(props: Props) {
           <div className="rail-left">
             <span className="rail-level">{setup.level === 'jv' ? 'JV' : setup.level}</span>
             <span className="rail-sets">{setLine}</span>
-            {state.warnings.length > 0 && (
-              <span className="rail-warn" title={state.warnings[state.warnings.length - 1]}>
-                {state.warnings[state.warnings.length - 1]}
-              </span>
-            )}
+            <span className="rail-status" hidden={status === null}>
+              {status}
+            </span>
           </div>
           <div className="rail-right">
+            {/* The one filled control in the app, and only ever one at a time. */}
+            <button
+              className="btn btn-primary"
+              hidden={!matchOver && setWinner === null}
+              style={{ padding: '0.9cqh 1.6cqh' }}
+              onClick={() =>
+                matchOver
+                  ? (append({ type: 'MATCH_ENDED', endTime: endTime() }), props.onCloseout())
+                  : append({
+                      type: 'SET_ENDED',
+                      setNumber: state.currentSet,
+                      endTime: endTime(),
+                    })
+              }
+            >
+              {matchOver ? 'end match' : 'end set'}
+            </button>
             <span className="rail-clock">{clock}</span>
             <span className="rail-icon" title="Saved on this device" aria-label="Saved on this device">
               {icons.save}
@@ -505,64 +529,13 @@ export default function InMatch(props: Props) {
           aria-label="How this screen works"
         >
           {HINT}
-        </div>
-
-        <div
-          className="sheet sheet-overflow"
-          hidden={overlay !== 'set-end'}
-          role="dialog"
-          aria-label="Set complete"
-        >
-          <div className="sheet-heading">
-            {state.score.home > state.score.visitor ? setup.home.name : setup.visitor.name} wins{' '}
-            {state.score.home}&ndash;{state.score.visitor}
-          </div>
-          Undo is still available behind this. End set {state.currentSet} only once the
-          score is right.
-          <div className="sheet-actions">
-            <span className="spacer" />
-            <button className="btn" onClick={() => setOverlay(null)}>
-              Not yet
-            </button>
-            <button
-              className="btn"
-              onClick={() => {
-                setOverlay(null)
-                append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
-              }}
-            >
-              End set {state.currentSet}
-            </button>
-          </div>
-        </div>
-
-        <div
-          className="sheet sheet-overflow"
-          hidden={overlay !== 'match-end'}
-          role="dialog"
-          aria-label="Match complete"
-        >
-          <div className="sheet-heading">
-            {setup[matchWinner].name} wins the match{' '}
-            {Math.max(state.setsWon.home, state.setsWon.visitor)}&ndash;
-            {Math.min(state.setsWon.home, state.setsWon.visitor)}
-          </div>
-          <div className="sheet-actions">
-            <span className="spacer" />
-            <button className="btn" onClick={() => setOverlay(null)}>
-              Not yet
-            </button>
-            <button
-              className="btn"
-              onClick={() => {
-                setOverlay(null)
-                append({ type: 'MATCH_ENDED', endTime: endTime() })
-                props.onCloseout()
-              }}
-            >
-              End match
-            </button>
-          </div>
+          {state.warnings.length > 0 && (
+            <div className="sheet-warnings">
+              {state.warnings.map((w) => (
+                <div key={w.text}>{w.text}</div>
+              ))}
+            </div>
+          )}
         </div>
 
         {adding && (

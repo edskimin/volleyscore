@@ -21,6 +21,7 @@ import {
   type Slot,
   type TeamSide,
   type TeamState,
+  type Warning,
 } from './types'
 
 // --- Rotation --------------------------------------------------------------
@@ -137,29 +138,9 @@ function checkLiberoServeLock(state: DerivedState, side: TeamSide): void {
   if (locked === undefined) {
     team.liberoSlotLock[libero] = slot
     team.slots[slot].liberoServeFlag = true
-  } else if (locked !== slot) {
-    state.warnings.push(
-      `Libero #${libero} (${side}) is set to serve from slot ${ROMAN[slot]}, but is ` +
-        `locked to slot ${ROMAN[locked]} this set.`,
-    )
   }
-}
-
-/**
- * A libero may only play back row, so rotating into positions 2, 3 or 4 means the
- * operator missed a replacement. Warn — the R2 makes the ruling, not the tablet — but
- * do not block, because the log must still record what the app was told.
- */
-function checkLiberoBackRow(state: DerivedState, side: TeamSide): void {
-  const team = state.teams[side]
-  if (!team.liberoOnCourt) return
-  const slot = team.slots.find((s) => s.current === team.liberoOnCourt)
-  if (slot && !BACK_ROW.includes(slot.position)) {
-    state.warnings.push(
-      `Libero #${team.liberoOnCourt} (${side}) rotated to court position ${slot.position}, ` +
-        `which is front row. She should have been replaced.`,
-    )
-  }
+  // A libero at position 1 in the wrong slot is a standing condition, so it is
+  // derived in computeWarnings rather than announced here.
 }
 
 // --- Rally -----------------------------------------------------------------
@@ -199,7 +180,6 @@ function applyRally(state: DerivedState, winner: TeamSide): void {
     recomputePass(w)
     state.serveTeam = winner
     checkLiberoServeLock(state, winner)
-    checkLiberoBackRow(state, winner)
 
     // A side-out point is won while receiving, so it can never be a libero point.
     appendMark(w, servingSlotIndex(w), {
@@ -292,11 +272,6 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
           slot: ev.slot,
           exceptional: ev.exceptional,
         })
-        if (team.subsUsed.length > MAX_SUBS) {
-          state.warnings.push(
-            `${ev.team} has used ${team.subsUsed.length} substitutions, over the limit of ${MAX_SUBS}.`,
-          )
-        }
         if (ev.exceptional) {
           team.comments.push(
             `Exceptional sub ${ev.playerIn}/${ev.playerOut} (${state.score[ev.team]}-${state.score[OTHER[ev.team]]})`,
@@ -316,11 +291,6 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
         const slot = team.slots[ev.slot]
         if (ev.direction === 'in') {
           if (slot) {
-            if (!BACK_ROW.includes(slot.position)) {
-              state.warnings.push(
-                `Libero #${ev.liberoNumber} (${ev.team}) entered at court position ${slot.position}, which is front row.`,
-              )
-            }
             slot.current = ev.liberoNumber
           }
           team.liberoOnCourt = ev.liberoNumber
@@ -446,7 +416,64 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
     state.matchComplete = true
   }
 
+  state.warnings = computeWarnings(state, setup)
   return state
+}
+
+/**
+ * Active rule warnings, derived from the final state rather than accumulated as the
+ * log is folded. They are conditions, not events: each names the object it marks so
+ * the mark can be rendered in place, and each clears by itself when the condition
+ * does. Nothing here blocks; the R2 makes the ruling.
+ */
+export function computeWarnings(state: DerivedState, setup: MatchSetup): Warning[] {
+  const out: Warning[] = []
+  for (const side of ['home', 'visitor'] as TeamSide[]) {
+    const team = state.teams[side]
+    const name = setup[side].name || side
+
+    if (team.subsUsed.length >= MAX_SUBS) {
+      out.push({
+        side,
+        target: 'subs',
+        text: `${name} has used all ${MAX_SUBS} substitutions.`,
+      })
+    }
+
+    const libero = team.liberoOnCourt
+    if (!libero) continue
+    const index = team.slots.findIndex((s) => s.current === libero)
+    if (index < 0) continue
+    const slot = team.slots[index]
+
+    // A libero may only play back row, so rotating into 2, 3 or 4 means a
+    // replacement was missed.
+    if (!BACK_ROW.includes(slot.position)) {
+      out.push({
+        side,
+        target: 'slot',
+        slot: index as SlotIndex,
+        text:
+          `${name}: libero #${libero} is at court position ${slot.position}, which is ` +
+          `front row. She should have been replaced.`,
+      })
+      continue
+    }
+
+    // A libero may serve in only one serve order slot per set.
+    const locked = team.liberoSlotLock[libero]
+    if (slot.position === 1 && locked !== undefined && locked !== index) {
+      out.push({
+        side,
+        target: 'slot',
+        slot: index as SlotIndex,
+        text:
+          `${name}: libero #${libero} is about to serve from slot ${ROMAN[index]}, but is ` +
+          `locked to slot ${ROMAN[locked]} this set.`,
+      })
+    }
+  }
+  return out
 }
 
 /** Undo is dropping the last event and re-folding. */

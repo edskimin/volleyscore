@@ -53,6 +53,20 @@ The layout is deliberately **not** fluid. The app is locked to a 1180 by 820 sta
 every dimension is a share of the stage height in `cqh`. The proportions between the
 score, the court and the roster row are the design.
 
+**A derived conclusion is announced, never enforced.** The app can compute that a set
+is over; only the first referee can decide it. Set and match completion appear as an
+amber status line in the rail plus one primary control, with the court live and undo
+reachable throughout. Nothing self-opens, scrims, or blocks. A prompt at set point that
+sits in front of undo blocks it at the moment a mis-tap is most likely and most costly.
+
+**A rule warning is a mark, not a message.** The warnings this app raises are states,
+not events, so `computeWarnings()` derives them from the final folded state rather than
+accumulating them as the log is folded, and each names the object it marks. An exhausted
+substitution budget turns the whole 18 counter amber; a slot in violation gets an amber
+outline on its court cell. Both clear by themselves when the condition does. The full
+text sits in the overflow sheet. Never a toast, a banner, or a rail message: during a
+rally the operator is looking at the court, not the corner.
+
 **Nothing that can appear mid-match may displace the court.** A tap target that moves
 is a mis-recorded rally. The overflow menu, the hint, the add-player sheet and the set
 and match end prompts are all absolutely positioned sheets above a `--scrim`, anchored

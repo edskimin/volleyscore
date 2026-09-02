@@ -119,6 +119,10 @@ body.in-match-host #root { display: flex; }
 }
 .app .rail-sets  { font-size: var(--type-label); color: var(--text-secondary); }
 .app .rail-clock { font-size: var(--type-label); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Set complete is a STATE, announced without seizing the screen. The court
+   stays live and undo stays reachable, because only the R1 can end a set. */
+.app .rail-status { font-size: var(--type-label); color: var(--flag-amber); }
+.app .rail-status[hidden] { display: none; }
 .app .rail-icon  { color: var(--text-muted); display: flex; }
 .app .rail-icon svg { width: 2.1cqh; height: 2.1cqh; }
 
@@ -220,6 +224,9 @@ body.in-match-host #root { display: flex; }
   font-family: inherit;
   text-align: left;
 }
+/* A warning is a persistent mark on the thing that is wrong, never a
+   message. It stays until the condition clears. */
+.app .cell.warn { outline: 1.5px solid var(--flag-amber); outline-offset: -1.5px; }
 .app .cell-top    { display: flex; align-items: center; gap: 0.5cqh; font-size: var(--type-cell-label); }
 .app .cell-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6cqh; }
 .app .cell-number { font-size: var(--type-cell); line-height: 1; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -318,6 +325,14 @@ body.in-match-host #root { display: flex; }
 .app .btn svg { width: 2.1cqh; height: 2.1cqh; }
 .app .btn:active { background: var(--control-hover); }
 .app .btn:disabled { opacity: 0.35; cursor: default; }
+/* Primary: the one filled control. Setup and confirmation actions only. */
+.app .btn-primary {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--app-bg);
+}
+.app .btn-primary:active { background: var(--text-secondary); border-color: var(--text-secondary); }
+.app .btn[hidden] { display: none; }
 .app .btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
 /* ---------------------------------------------------------------------------
@@ -384,12 +399,10 @@ body.in-match-host #root { display: flex; }
 }
 .app .sheet input:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
-/* Amber means exactly one thing: something happened outside the normal rules. */
-.app .rail-left { min-width: 0; }
-.app .rail-warn {
+/* The reference copy of any active warning, read when there is a moment. */
+.app .sheet-warnings {
+  margin-top: 1.2cqh;
+  padding-top: 1.2cqh;
+  border-top: 1px solid var(--border);
   color: var(--flag-amber);
-  font-size: var(--type-label);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

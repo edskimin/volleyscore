@@ -160,10 +160,31 @@ A sheet anchored above the action bar sits at `bottom: 11cqh`.
 Tapping the scrim or pressing Escape dismisses. No shadows; the border and scrim
 carry the separation.
 
+## Announcing state without interrupting
+
+Two rules that govern anything the app wants to tell the operator mid-match.
+
+**A derived conclusion is announced, never enforced.** The app can compute that a set
+is over. Only the first referee can decide it. So set complete and match complete
+appear as an amber status line in the rail plus a primary "end set" control, with the
+court fully live and undo reachable throughout. They never open a modal, never scrim,
+and never self-dismiss. A prompt at set point that blocks undo is the worst possible
+moment to block undo.
+
+**A rule warning is a mark, not a message.** The warnings this app raises are states,
+not events: a libero about to serve from a second slot, a sub budget exhausted. Mark
+the object that is wrong and let the mark persist until the condition clears. An
+exhausted budget turns the whole 18 counter amber. A slot in violation gets a 1.5px
+amber outline on its court cell. Never a toast, a banner, or a rail message: during a
+rally the operator is looking at the court and the scores, and a line in the corner
+will not be read. The overflow sheet carries the full text of any active warning for
+when there is a moment to read it.
+
 ## Controls
 
 Buttons are outlined, never filled, except the primary action in a setup or
-confirmation flow. Padding `1.2cqh` by `2cqh`, 1.5px border, `--radius-control`.
+confirmation flow. A primary button is filled with `--text-primary` and its label is
+`--app-bg`. There is at most one on screen at a time. Padding `1.2cqh` by `2cqh`, 1.5px border, `--radius-control`.
 Icon plus label with a `0.8cqh` gap. Icons are `2.1cqh` inline SVG at 1.7 stroke width.
 
 Team-scoped buttons in the action bar carry that team's derived `rule` color as their
@@ -216,5 +237,7 @@ noise, and it implies a degraded state that does not exist.
 - Do not use green or red for status. Red is a legitimate team color and would collide.
 - Do not add shadows. Depth comes from the surface hierarchy and the scrim.
 - Do not let any overlay displace the court.
+- Do not put a modal in front of undo, at set point or anywhere else.
+- Do not report a rule violation as a message when it can be a mark.
 - Do not add gradients.
 - Do not use all-caps for anything other than the two structural labels named above.

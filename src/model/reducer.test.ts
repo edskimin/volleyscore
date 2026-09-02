@@ -300,7 +300,15 @@ describe('libero', () => {
     const s = fold(setup(), events)
     expect(servingSlotIndex(s.teams.home)).toBe(5)
     expect(s.teams.home.liberoSlotLock['30']).toBe(4) // lock is not moved
-    expect(s.warnings.some((w) => w.includes('locked to slot V'))).toBe(true)
+    // The warning marks the slot it is about, so the cell can carry the mark.
+    expect(s.warnings).toEqual([
+      {
+        side: 'home',
+        target: 'slot',
+        slot: 5,
+        text: expect.stringContaining('locked to slot V'),
+      },
+    ])
   })
 })
 
@@ -395,7 +403,9 @@ describe('libero back row', () => {
     const s = fold(setup(), events)
     const slot = s.teams.home.slots.find((x) => x.current === '30')
     expect(slot?.position).toBe(4)
-    expect(s.warnings.some((w) => w.includes('front row'))).toBe(true)
+    expect(s.warnings).toEqual([
+      { side: 'home', target: 'slot', slot: 0, text: expect.stringContaining('front row') },
+    ])
   })
 })
 
@@ -466,5 +476,52 @@ describe('adjustment', () => {
     expect(s.teams.home.liberoOnCourt).toBe('30')
     expect(s.teams.home.liberoOwes['30']).toBe('15')
     expect(s.teams.home.subsUsed).toEqual([])
+  })
+})
+
+describe('warnings are states, not events', () => {
+  it('marks the substitution counter once the budget is spent, not after it', () => {
+    const events: MatchEvent[] = [setStarted('home')]
+    const sub = (playerIn: string, playerOut: string) =>
+      ev({ type: 'SUBSTITUTION', team: 'home', playerIn, playerOut, slot: 3, exceptional: false })
+
+    for (let i = 0; i < 17; i++) events.push(i % 2 === 0 ? sub('2', '4') : sub('4', '2'))
+    expect(fold(setup(), events).warnings).toEqual([])
+
+    events.push(sub('4', '2'))
+    expect(fold(setup(), events).warnings).toEqual([
+      { side: 'home', target: 'subs', text: expect.stringContaining('all 18 substitutions') },
+    ])
+  })
+
+  it('clears a libero warning by itself once the condition clears', () => {
+    const events: MatchEvent[] = [setStarted('home', { home: ['30'], visitor: [] })]
+    events.push(
+      ev({
+        type: 'LIBERO_REPLACE',
+        team: 'home',
+        liberoNumber: '30',
+        direction: 'in',
+        slot: 0,
+        playerNumber: '12',
+      }),
+    )
+    // Rotate her round to the front row.
+    for (let i = 0; i < 6; i++) events.push(rally(i % 2 === 0 ? 'visitor' : 'home'))
+    expect(fold(setup(), events).warnings).toHaveLength(1)
+
+    // Taking her off court ends the condition, so the mark goes with it. No
+    // dismissal, no stale message left behind.
+    events.push(
+      ev({
+        type: 'LIBERO_REPLACE',
+        team: 'home',
+        liberoNumber: '30',
+        direction: 'out',
+        slot: 0,
+        playerNumber: '12',
+      }),
+    )
+    expect(fold(setup(), events).warnings).toEqual([])
   })
 })

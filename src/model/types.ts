@@ -250,6 +250,14 @@ export interface SetResult {
   endTime: string | null
 }
 
+export interface Warning {
+  side: TeamSide
+  /** What to mark: a court cell, or the substitution counter. */
+  target: 'slot' | 'subs'
+  slot?: SlotIndex
+  text: string
+}
+
 export interface DerivedState {
   currentSet: number
   targetScore: number
@@ -263,6 +271,11 @@ export interface DerivedState {
   teams: Record<TeamSide, TeamState>
   rosters: Record<TeamSide, RosterPlayer[]>
   completedSets: SetResult[]
-  /** Non-blocking advisories. The R2 makes rulings, not the tablet. */
-  warnings: string[]
+  /**
+   * Active rule warnings. These are states, not events: each names the object it
+   * marks so the mark can be rendered in place and persist until the condition
+   * clears. Never a toast, a banner, or a rail message. The R2 makes rulings, not
+   * the tablet, so nothing here blocks.
+   */
+  warnings: Warning[]
 }
