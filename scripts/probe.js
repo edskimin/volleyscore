@@ -4,7 +4,8 @@
  *   layoutProbe()  asserts no overlay displaces the court
  *   anchorProbe()  asserts a team-scoped sheet opens on that team's side
  *   colorProbe()   asserts nothing renders a color outside the sanctioned set,
- *                  and that every warning mark is amber and thick enough to find
+ *                  that every warning mark is amber and thick enough to find, and
+ *                  that no layer holds more than one primary button
  *
  * Both were written because a defect got past a screenshot: the first because an
  * earlier port put the hint in the layout flow, the second because a green check mark
@@ -139,6 +140,17 @@ function colorProbe(teamHexes) {
     if (anySpent && !spent) marks.push({ what: 'sub row', ok: true, value: 'partial: exceptional subs only' })
   }
 
+  /* At most one primary PER LAYER. A scrim defines a layer: while a sheet is open
+     nothing beneath it is actionable, so a primary in the sheet and one in the base
+     screen are not competing. Counting globally would fail a correct screen, so
+     count only the primaries in the layer the operator can actually reach. */
+  const scrimOpen = [...document.querySelectorAll('.scrim')].some((e) => !e.hidden)
+  const primaries = [...document.querySelectorAll('.btn-primary, .btn.primary')].filter((el) => {
+    if (el.hidden || el.closest('[hidden]')) return false
+    const inSheet = !!el.closest('.sheet:not([hidden])')
+    return scrimOpen ? inSheet : !inSheet
+  })
+
   return {
     theme: document.documentElement.dataset.theme,
     scanned: document.querySelectorAll('.app, .app *').length,
@@ -146,6 +158,10 @@ function colorProbe(teamHexes) {
     detail: bad,
     markChecks: marks.length,
     markFailures: marks.filter((m) => !m.ok),
+    layer: scrimOpen ? 'sheet' : 'base',
+    primariesInLayer: primaries.length,
+    primaryLabels: primaries.map((p) => p.textContent.trim()),
+    primaryPass: primaries.length <= 1,
   }
 }
 

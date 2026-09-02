@@ -77,6 +77,11 @@ collide with a panel. A completed state is the primary text color; an attention 
 `--flag-amber`. Those are the only two, and `src/ui/colors.test.ts` enforces it by
 scanning the stylesheets, so an unsanctioned color fails the suite rather than shipping.
 
+**At most one primary button per layer, not per screen.** A scrim defines a layer:
+while a sheet is open nothing beneath it is actionable, so a primary in the sheet and
+one in the base screen are not competing and the base one is not swapped to outlined.
+Two primaries in the *same* layer means the screen has two answers to "what next".
+
 **A sheet anchors to the side of the thing it acts on.** Adding a player to the home
 team opens the sheet on the left, to the visiting team on the right. The screen is
 already mirrored, so a sheet that ignores that makes the title the only signal of which

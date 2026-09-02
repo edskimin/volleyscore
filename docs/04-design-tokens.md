@@ -200,7 +200,17 @@ when there is a moment to read it.
 
 Buttons are outlined, never filled, except the primary action in a setup or
 confirmation flow. A primary button is filled with `--text-primary` and its label is
-`--app-bg`. There is at most one on screen at a time. Padding `1.2cqh` by `2cqh`, 1.5px border, `--radius-control`.
+`--app-bg`. There is at most one primary **per layer**.
+
+A scrim defines a layer. While a sheet is open, nothing beneath it is actionable and
+the scrim already renders anything below it as recessive, so a primary in the sheet
+and a primary in the base screen do not compete. Do not swap the base screen's primary
+to outlined when a sheet opens; that adds a state transition to solve a problem the
+scrim has already solved.
+
+Two primaries in the SAME layer is the real violation, and it means the screen has two
+answers to "what should I do next". Pick one and outline the other. On match closeout,
+export is the primary; finishing and closing is not. Padding `1.2cqh` by `2cqh`, 1.5px border, `--radius-control`.
 Icon plus label with a `0.8cqh` gap. Icons are `2.1cqh` inline SVG at 1.7 stroke width.
 
 Team-scoped buttons in the action bar carry that team's derived `rule` color as their

@@ -160,11 +160,9 @@ export default function Closeout({
       </section>
 
       <div className="closeout-actions">
-        <button
-          className="btn primary lg"
-          disabled={!exportedAt}
-          onClick={() => void onComplete()}
-        >
+        {/* Export is the primary action on this screen; finishing is not. Two
+            filled controls in one layer is two answers to "what next". */}
+        <button className="btn lg" disabled={!exportedAt} onClick={() => void onComplete()}>
           Finish and close
         </button>
         {!exportedAt && <span className="faint">Export the file first.</span>}

@@ -72,9 +72,11 @@ export default function InstallPrompt({ onDismiss }: Props) {
         </p>
       </div>
       <div className="install-actions">
+        {/* Outlined: the home screen's primary is "New match", and two filled
+            controls in one layer is two answers to "what next". */}
         {deferred && (
           <button
-            className="btn primary"
+            className="btn"
             onClick={() => {
               void deferred.prompt().then(() => setDeferred(null))
             }}
