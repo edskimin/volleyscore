@@ -169,6 +169,26 @@ for sheets that belong to neither team.
 Tapping the scrim or pressing Escape dismisses. No shadows; the border and scrim
 carry the separation.
 
+## Screen position is not team role
+
+The two panels are the **left team** and the **right team**. Home and visitor are tags
+on a team, rendered as a small label beside the name, never a position.
+
+This is not a preference. The OHSAA sheet is written as the teams stand on the court
+from the scorekeeper's viewpoint, so which side a team occupies is already a required
+per-set fact. And the operator cannot reliably score a screen that mirrors what is in
+front of them, which depends on where they are sitting, not on who is hosting.
+
+So: set setup asks which team is on your left, and the in-match overflow carries a
+flip. Both write the same per-set fact.
+
+**Side never enters the event log.** Events are keyed to team identity, so a flip is a
+rendering change plus a per-set record. Flipping mid-set corrupts nothing, which is
+what makes it safe to offer as a casual control rather than a guarded one.
+
+Everything positional keys off `left` and `right`: the court grid mapping, panel
+mirroring, action bar groups, and sheet anchoring.
+
 ## Announcing state without interrupting
 
 Two rules that govern anything the app wants to tell the operator mid-match.

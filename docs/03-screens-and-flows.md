@@ -77,7 +77,9 @@ Runs before every set, including set 1.
   best-of-3 third set, default 25. Always editable in one tap, because JV third sets
   vary between 15 and 25.
 - **Libero designation** per team for this set. May differ per set.
-- **Teams switched sides** toggle, default off.
+- **Which team is on your left**, defaulting to the previous set's value. Replaces the
+  old "teams switched sides" toggle: the operator has to score what is physically in
+  front of them, and that depends on where they are sitting, not on who is hosting.
 
 Emits `SET_STARTED`.
 
@@ -213,6 +215,7 @@ Undo dims when there is nothing to undo.
 ### Overflow menu
 
 - Hint (explains the gestures)
+- Flip sides on screen
 - Re-serve
 - Add a player to a roster
 - Fix lineup (adjustment mode)

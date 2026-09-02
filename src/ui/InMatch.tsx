@@ -182,10 +182,13 @@ export default function InMatch(props: Props) {
     setSel({ side, kind: 'cell', value: slot })
   }
 
-  const setLine =
-    state.completedSets.map((s) => `${s.score.home}–${s.score.visitor}`).join(' · ') +
-    (state.completedSets.length > 0 ? ' · ' : '') +
-    'in progress'
+  // Completed results only. A set ended without meeting its win condition has no
+  // result, and listing it as one more score reads at a glance like a set someone won.
+  const played = state.completedSets.filter((s) => s.winner !== null)
+  const setLine = [
+    ...played.map((s) => `${s.score.home}\u2013${s.score.visitor}`),
+    'in progress',
+  ].join(' \u00b7 ')
 
   const endTime = () => new Date().toTimeString().slice(0, 5)
   const matchWinner: TeamSide = state.setsWon.home > state.setsWon.visitor ? 'home' : 'visitor'

@@ -191,6 +191,8 @@ body {
   gap: var(--s3);
 }
 .panel-name { font-size: var(--type-team); font-weight: 600; }
+/* Home and visitor are tags on a team, never a position. */
+.panel-role { font-size: var(--type-micro); letter-spacing: 0.14em; text-transform: uppercase; margin-right: 0.8cqh; }
 .panel-sets { font-size: var(--type-label); }
 
 /* Score outboard, court inboard, so the two front rows face each other. */
@@ -202,9 +204,9 @@ body {
   gap: var(--s3);
   min-height: 0;
 }
-.panel[data-side="visitor"] .panel-body  { flex-direction: row-reverse; }
-.panel[data-side="visitor"] .score-block { align-items: flex-end; }
-.panel[data-side="visitor"] .serve-line  { flex-direction: row-reverse; }
+.panel[data-pos="right"] .panel-body  { flex-direction: row-reverse; }
+.panel[data-pos="right"] .score-block { align-items: flex-end; }
+.panel[data-pos="right"] .serve-line  { flex-direction: row-reverse; }
 
 /* --- the score IS the button --- */
 .score-block {
@@ -469,23 +471,23 @@ body {
   </header>
 
   <main class="court-area">
-    <section class="panel" id="panel-home" data-side="home" aria-label="Home team"></section>
+    <section class="panel" id="panel-left" data-pos="left"></section>
     <div class="divider">
       <span class="divider-label">Set</span>
       <span class="divider-set" id="set-number">3</span>
       <span class="divider-rule"></span>
       <span class="divider-match" id="match-score">1&ndash;1</span>
     </div>
-    <section class="panel" id="panel-visitor" data-side="visitor" aria-label="Visiting team"></section>
+    <section class="panel" id="panel-right" data-pos="right"></section>
   </main>
 
   <footer class="bar">
     <div class="bar-group">
-      <button class="btn" id="to-home">
+      <button class="btn" id="to-left">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4"/><path d="M9 2h6"/></svg>
         time out
       </button>
-      <div class="to-slots" id="to-slots-home"></div>
+      <div class="to-slots" id="to-slots-left"></div>
     </div>
     <div class="bar-group centre">
       <button class="btn" id="undo-btn">
@@ -501,8 +503,8 @@ body {
       </button>
     </div>
     <div class="bar-group right">
-      <div class="to-slots" id="to-slots-visitor"></div>
-      <button class="btn" id="to-vis">
+      <div class="to-slots" id="to-slots-right"></div>
+      <button class="btn" id="to-right">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4"/><path d="M9 2h6"/></svg>
         time out
       </button>
@@ -593,6 +595,11 @@ var S = {
   theme: "dark",
   setNumber: 3,
   targetScore: 25,
+  /* Which team is physically on the scorer's LEFT. Recorded per set, because
+     the OHSAA sheet is written as the teams stand from the scorer's viewpoint.
+     The event log never uses this: events are keyed to team identity, so
+     flipping is purely a rendering change and corrupts nothing. */
+  leftTeam: "home",
   serveTeam: "home",
   selection: null,
   sheet: null,          /* null | "overflow" | "add-home" | "add-visitor" */
@@ -638,6 +645,9 @@ seedPositions(S.visitor, false);
    RULES
    ================================================================= */
 function teamSide(team) { return team === S.home ? "home" : "visitor"; }
+function other(id)  { return id === "home" ? "visitor" : "home"; }
+function teamAt(pos){ return pos === "left" ? S.leftTeam : other(S.leftTeam); }
+function posOf(id)  { return S.leftTeam === id ? "left" : "right"; }
 function rotate(team) {
   team.slots.forEach(function(s) { s.position = ((s.position - 2 + 6) % 6) + 1; });
 }
@@ -711,7 +721,9 @@ function sideWarned(side) {
 /* Court position to grid cell, row-major over two columns.
    Home has the net on its right, so its front column is on the right.
    Visitor mirrors, putting the two front rows against the divider. */
-var GRID = { home: [5, 4, 6, 3, 1, 2], visitor: [2, 1, 3, 6, 4, 5] };
+/* Keyed by SCREEN POSITION, so the left court's front row always faces the
+   divider whichever team is standing there. */
+var GRID = { left: [5, 4, 6, 3, 1, 2], right: [2, 1, 3, 6, 4, 5] };
 var FRONT_ROW = [2, 3, 4];
 
 function triangle(em, color) {
@@ -724,14 +736,16 @@ function ballIcon(color) {
          '<circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 0 0 18"/><path d="M4 8a15 15 0 0 0 16 8"/></svg>';
 }
 
-function renderPanel(side) {
+function renderPanel(pos) {
+  var side = teamAt(pos);
   var t = S[side];
   var p = derivePalette(t.color, S.theme);
   var serving = S.serveTeam === side;
-  var el = document.getElementById("panel-" + side);
+  var el = document.getElementById("panel-" + pos);
+  el.setAttribute("aria-label", t.name);
   el.style.background = serving ? p.base : p.dim;
 
-  var cells = GRID[side].map(function(pos) {
+  var cells = GRID[pos].map(function(pos) {
     var slot = slotAtPosition(t, pos);
     var isServer = serving && pos === 1;
     var selected = S.selection && S.selection.team === side &&
@@ -787,7 +801,9 @@ function renderPanel(side) {
 
   el.innerHTML =
     '<div class="panel-head">' +
-      '<span class="panel-name" style="color:' + p.ink + '">' + t.name +
+      '<span class="panel-name" style="color:' + p.ink + '">' +
+        '<span class="panel-role" style="color:' + p.inkMuted + '">' +
+          (side === "home" ? "Home" : "Visitor") + "</span>" + t.name +
         (sideWarned(side) ? '<span class="head-flag"></span>' : "") + "</span>" +
       '<span class="panel-sets" style="color:' + p.inkMuted + '">sets ' + t.sets + "</span>" +
     "</div>" +
@@ -803,24 +819,21 @@ function renderPanel(side) {
 }
 
 function render() {
-  renderPanel("home");
-  renderPanel("visitor");
+  renderPanel("left");
+  renderPanel("right");
 
   /* Team-scoped controls carry that team's rule colour, so the operator
      knows which side a button belongs to without reading the label. */
-  var ph = derivePalette(S.home.color, S.theme), pv = derivePalette(S.visitor.color, S.theme);
-  document.getElementById("to-home").style.borderColor = ph.rule;
-  document.getElementById("to-vis").style.borderColor = pv.rule;
-
-  [["home", ph], ["visitor", pv]].forEach(function(pair) {
-    var side = pair[0], pal = pair[1], t = S[side], h = "";
+  ["left", "right"].forEach(function(pos) {
+    var side = teamAt(pos), t = S[side], pal = derivePalette(t.color, S.theme), h = "";
+    var btn = document.getElementById("to-" + pos);
+    btn.style.borderColor = pal.rule;
+    btn.disabled = t.timeouts.length >= 2;
     for (var i = 0; i < 2; i++) {
       var v = t.timeouts[i];
-      h += '<div class="to-slot" data-used="' + !!v + '" style="border-color:' + pal.rule + '">' +
-           (v || "") + "</div>";
+      h += '<div class="to-slot" data-used="' + !!v + '" style="border-color:' + pal.rule + '">' + (v || "") + "</div>";
     }
-    document.getElementById("to-slots-" + side).innerHTML = h;
-    document.getElementById(side === "home" ? "to-home" : "to-vis").disabled = t.timeouts.length >= 2;
+    document.getElementById("to-slots-" + pos).innerHTML = h;
   });
 
   document.getElementById("set-number").textContent = S.setNumber;
@@ -858,6 +871,7 @@ function renderSheet() {
       '<div class="sheet-menu">' +
         '<button class="btn" data-open="add-home">Add player to ' + S.home.name + "</button>" +
         '<button class="btn" data-open="add-visitor">Add player to ' + S.visitor.name + "</button>" +
+        '<button class="btn" data-flip="1">Flip sides on screen</button>' +
         '<button class="btn" data-mark="replay">Replay</button>' +
         '<button class="btn" data-mark="reserve">Re-serve</button>' +
       "</div>";
@@ -866,7 +880,7 @@ function renderSheet() {
 
   /* Add player: anchored to the side of the team being changed. */
   var side = S.sheet === "add-home" ? "home" : "visitor";
-  el.className = "sheet " + (side === "home" ? "sheet-left" : "sheet-right");
+  el.className = "sheet sheet-" + posOf(side);   /* anchor follows the team */
   el.innerHTML =
     '<div class="sheet-title">Add a player to ' + S[side].name + "</div>" +
     '<div class="sheet-row">' +
@@ -995,8 +1009,8 @@ function callTimeout(side) {
   t.timeouts.push(t.points + "\u2013" + o.points);   /* calling team's score first */
   render();
 }
-document.getElementById("to-home").onclick = function() { callTimeout("home"); };
-document.getElementById("to-vis").onclick  = function() { callTimeout("visitor"); };
+document.getElementById("to-left").onclick  = function() { callTimeout(teamAt("left")); };
+document.getElementById("to-right").onclick = function() { callTimeout(teamAt("right")); };
 
 document.getElementById("undo-btn").onclick = undo;
 document.getElementById("more-btn").onclick = function() {
@@ -1007,9 +1021,10 @@ document.addEventListener("keydown", function(e) {
   if (e.key === "Escape" && S.sheet) { S.sheet = null; render(); }
 });
 document.getElementById("sheet").addEventListener("click", function(e) {
-  var t = e.target.closest("[data-open],[data-add],[data-sheet-close],[data-mark]");
+  var t = e.target.closest("[data-open],[data-add],[data-sheet-close],[data-mark],[data-flip]");
   if (!t) return;
   if (t.dataset.sheetClose) { S.sheet = null; return render(); }
+  if (t.dataset.flip) { S.leftTeam = other(S.leftTeam); S.sheet = null; return render(); }
   /* Replay and re-serve are notation only. Neither is a team action: the mark
      goes in the current server's box whoever caused it. */
   if (t.dataset.mark) { S.log.push(snapshot()); S.sheet = null; return render(); }

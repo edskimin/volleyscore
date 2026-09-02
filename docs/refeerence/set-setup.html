@@ -121,8 +121,8 @@ body { display: flex; user-select: none; -webkit-user-select: none; touch-action
 /* Serve order list beside the derived court. Mirrored per side so the two
    courts sit adjacent, exactly as they do on the in-match screen. */
 .card-body { flex: 0 0 auto; display: flex; gap: var(--s3); align-items: flex-start; }
-.card[data-side="visitor"] .card-body { flex-direction: row-reverse; }
-.card[data-side="visitor"] .card-head { text-align: right; }
+.card[data-pos="right"] .card-body { flex-direction: row-reverse; }
+.card[data-pos="right"] .card-head { text-align: right; }
 
 .order { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.6cqh; }
 .slot {
@@ -210,8 +210,8 @@ body { display: flex; user-select: none; -webkit-user-select: none; touch-action
 
   <div class="controls" id="controls"></div>
   <main class="cards">
-    <section class="card" data-side="home" id="card-home"></section>
-    <section class="card" data-side="visitor" id="card-visitor"></section>
+    <section class="card" data-pos="left" id="card-left"></section>
+    <section class="card" data-pos="right" id="card-right"></section>
   </main>
 
 </div></div>
@@ -240,7 +240,10 @@ var S = {
   setNumber: 2,
   firstServe: "visitor",
   target: 25,
-  sidesSwitched: false,
+  /* Which team the scorer sees on their LEFT. This replaces a "sides switched"
+     flag: what matters is not whether they swapped but where they are now, and
+     the OHSAA sheet is written as the teams stand from the scorer's viewpoint. */
+  leftTeam: "home",
   active: { home: 0, visitor: 0 },   /* which slot the next chip fills */
   home: {
     name: "Avon Lake", color: "#14284B",
@@ -263,7 +266,9 @@ function positionOf(side, slotIndex) {
   var serves = S.firstServe === side;
   return serves ? slotIndex + 1 : ((slotIndex + 1) % 6) + 1;
 }
-var GRID = { home: [5,4,6,3,1,2], visitor: [2,1,3,6,4,5] };
+var GRID = { left: [5,4,6,3,1,2], right: [2,1,3,6,4,5] };
+function other(id)  { return id === "home" ? "visitor" : "home"; }
+function teamAt(pos){ return pos === "left" ? S.leftTeam : other(S.leftTeam); }
 var FRONT = [2,3,4];
 
 function nextEmpty(side, from) {
@@ -288,11 +293,12 @@ function renderControls() {
   document.getElementById("controls").innerHTML =
     seg("First serve", [{v:"home",t:S.home.name},{v:"visitor",t:S.visitor.name}], S.firstServe, "data-serve") +
     seg("Play to", [{v:"15",t:"15"},{v:"25",t:"25"}], String(S.target), "data-target") +
-    seg("Sides", [{v:"same",t:"As set 1"},{v:"switched",t:"Switched"}], S.sidesSwitched ? "switched" : "same", "data-sides");
+    seg("On your left", [{v:"home",t:S.home.name},{v:"visitor",t:S.visitor.name}], S.leftTeam, "data-left");
 }
 
-function renderCard(side) {
-  var t = S[side], p = derivePalette(t.color, S.theme), el = document.getElementById("card-" + side);
+function renderCard(pos) {
+  var side = teamAt(pos);
+  var t = S[side], p = derivePalette(t.color, S.theme), el = document.getElementById("card-" + pos);
 
   var slots = t.lineup.map(function(n, i) {
     var act = S.active[side] === i;
@@ -304,7 +310,7 @@ function renderCard(side) {
   }).join("");
 
   /* Derived court. Reading it against the floor is what catches a mis-tap. */
-  var cells = GRID[side].map(function(pos) {
+  var cells = GRID[pos].map(function(pos) {
     var idx = -1;
     for (var i = 0; i < 6; i++) if (positionOf(side, i) === pos) idx = i;
     var n = t.lineup[idx];
@@ -348,8 +354,8 @@ function renderCard(side) {
 
 function render() {
   renderControls();
-  renderCard("home");
-  renderCard("visitor");
+  renderCard("left");
+  renderCard("right");
   document.getElementById("rail-title").textContent = "Set " + S.setNumber;
   document.getElementById("rail-sub").textContent =
     S.setNumber > 1 ? "Lineups carried over from set " + (S.setNumber - 1) + ". Change what moved." : "";
@@ -364,8 +370,8 @@ function bind() {
   document.querySelectorAll("[data-target]").forEach(function(b) {
     b.onclick = function() { S.target = +b.dataset.target; render(); };
   });
-  document.querySelectorAll("[data-sides]").forEach(function(b) {
-    b.onclick = function() { S.sidesSwitched = b.dataset.sides === "switched"; render(); };
+  document.querySelectorAll("[data-left]").forEach(function(b) {
+    b.onclick = function() { S.leftTeam = b.dataset.left; render(); };
   });
 
   /* Slot tap is CORRECTION only: it moves the cursor, it does not enter. */
