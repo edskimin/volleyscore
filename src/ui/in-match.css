@@ -424,6 +424,11 @@ body.stage-host #root { display: flex; }
   font-size: var(--type-body);
 }
 .app.in-match .field::placeholder { color: var(--text-muted); }
+/* The consequence of the one menu action that removes events, stated where the
+   action is. Amber because it is the app's single attention state; the second tap,
+   not the color, is what makes it safe. */
+.app.in-match .sheet-note { margin: 0; color: var(--flag-amber); }
+
 .app.in-match .sheet-menu { display: flex; flex-direction: column; gap: var(--s1); margin-top: var(--s2); }
 .app.in-match .sheet-menu .btn { justify-content: flex-start; }
 

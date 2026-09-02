@@ -19,7 +19,7 @@ import {
   db,
   type MatchRecord,
 } from '../db/db'
-import { fold } from '../model/reducer'
+import { dropCurrentSet as dropSetStart, fold } from '../model/reducer'
 import type { DerivedState, EventBody, MatchEvent, MatchSetup } from '../model/types'
 
 function stamp(events: MatchEvent[], body: EventBody): MatchEvent {
@@ -42,6 +42,11 @@ export interface MatchStore {
   /** Undo is dropping the last event and re-folding. */
   undoLast: () => void
   canUndo: boolean
+  /**
+   * Drop the in-progress set's SET_STARTED and everything after it, so its setup can
+   * be declared again. Refuses once that set has ended.
+   */
+  dropCurrentSet: () => void
   start: (setup: MatchSetup) => Promise<void>
   /** Edit team names, colors, officials and rosters after the match has begun. */
   updateSetup: (setup: MatchSetup) => Promise<void>
@@ -121,6 +126,20 @@ export function useMatchStore(): MatchStore {
     })
   }, [])
 
+  /**
+   * One write, not a loop of undoLast: each of those is a separate setRecord, and the
+   * one that persisted last would win. The rule for what may be dropped lives in the
+   * reducer, next to undo.
+   */
+  const dropCurrentSet = useCallback(() => {
+    setRecord((prev) => {
+      if (!prev) return prev
+      const events = dropSetStart(prev.events)
+      if (events === prev.events) return prev
+      return { ...prev, events, updatedAt: new Date().toISOString() }
+    })
+  }, [])
+
   const start = useCallback(
     async (setup: MatchSetup) => {
       setRecord(await createMatch(setup))
@@ -175,6 +194,7 @@ export function useMatchStore(): MatchStore {
     append,
     undoLast,
     canUndo: (record?.events.length ?? 0) > 0,
+    dropCurrentSet,
     start,
     updateSetup,
     exportMatch,

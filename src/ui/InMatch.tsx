@@ -30,6 +30,8 @@ interface Props {
   onEditSetup: () => void
   onCloseout: () => void
   onSetEnded: () => void
+  /** Drop this set's start and go back to set setup to declare it again. */
+  onReopenSetup: () => void
   onAdjust: () => void
   onExport: () => void
   onHome: () => void
@@ -141,6 +143,8 @@ export default function InMatch(props: Props) {
   type Overlay = 'menu' | 'add-home' | 'add-visitor'
   const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [newNumber, setNewNumber] = useState('')
+  /** Armed by the first tap when going back would drop more than the set start. */
+  const [confirmReopen, setConfirmReopen] = useState(false)
   const [newName, setNewName] = useState('')
 
   const [clock, setClock] = useState(() => new Date().toTimeString().slice(0, 5))
@@ -202,6 +206,22 @@ export default function InMatch(props: Props) {
     ...played.map((s) => `${s.score.home}\u2013${s.score.visitor}`),
     ...(live ? ['in progress'] : []),
   ].join(' \u00b7 ')
+
+  /* Before the first point a set's setup is not history yet, so it can be declared
+     again rather than corrected in place. Fix lineup is the other tool and stays the
+     right one afterwards: it writes an ADJUSTMENT, which prints as a comment on the
+     sheet. A comment explaining a correction to a set where nothing had happened is a
+     mark about nothing. */
+  const setStartIndex = (() => {
+    for (let i = events.length - 1; i >= 0; i--) if (events[i].type === 'SET_STARTED') return i
+    return -1
+  })()
+  const canReopenSetup =
+    state.setInProgress && state.score.home + state.score.visitor === 0 && setStartIndex !== -1
+  /* Anything recorded between the set start and now goes with it. A substitution
+     before the first serve is meaningless once the lineup is re-entered, but a time
+     out is a real record, so the count is stated rather than dropped quietly. */
+  const droppedOnReopen = setStartIndex === -1 ? 0 : events.length - setStartIndex - 1
 
   const endTime = () => new Date().toTimeString().slice(0, 5)
   const matchWinner: TeamSide = state.setsWon.home > state.setsWon.visitor ? 'home' : 'visitor'
@@ -551,7 +571,14 @@ export default function InMatch(props: Props) {
 
         {/* Nothing that can appear mid-match may displace the court: a tap target
             that moves is a mis-recorded rally. Everything below floats above it. */}
-        <div className="scrim" hidden={overlay === null} onClick={() => setOverlay(null)} />
+        <div
+          className="scrim"
+          hidden={overlay === null}
+          onClick={() => {
+            setOverlay(null)
+            setConfirmReopen(false)
+          }}
+        />
 
         {/* One sheet element. Its anchor is the side of the thing it acts on, so the
             operator does not have to read the title to know which team changes. */}
@@ -576,6 +603,27 @@ export default function InMatch(props: Props) {
                 <button className="btn" onClick={() => { setOverlay(null); props.onAdjust() }}>
                   Fix lineup
                 </button>
+                {canReopenSetup && (
+                  <>
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        if (droppedOnReopen > 0 && !confirmReopen) return setConfirmReopen(true)
+                        setOverlay(null)
+                        setConfirmReopen(false)
+                        props.onReopenSetup()
+                      }}
+                    >
+                      Back to set {state.currentSet} setup
+                    </button>
+                    {droppedOnReopen > 0 && (
+                      <p className="sheet-note">
+                        {droppedOnReopen === 1 ? '1 action' : `${droppedOnReopen} actions`} recorded
+                        since the set started {confirmReopen ? 'will be removed. Tap again to go back.' : 'would be removed.'}
+                      </p>
+                    )}
+                  </>
+                )}
                 <button className="btn" onClick={() => setOverlay('add-home')}>
                   Add player to {setup.home.name}
                 </button>

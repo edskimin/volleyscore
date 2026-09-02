@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  dropCurrentSet,
   fold,
   foldThroughSet,
   initialPosition,
@@ -914,5 +915,74 @@ describe('a deciding set is a standing, not a set number', () => {
     const won = { home: 2, visitor: 2 }
     expect(isDecidingSet('best_of_5', won)).toBe(true)
     expect(isDecidingSet('best_of_5', { home: 2, visitor: 1 })).toBe(false)
+  })
+})
+
+
+// --- Re-declaring a set's setup ---------------------------------------------
+
+describe('a set start can be taken back before the first point', () => {
+  const started = (firstServe: TeamSide, setNumber = 1) =>
+    ev({
+      type: 'SET_STARTED',
+      setNumber,
+      targetScore: 25,
+      firstServe,
+      leftTeam: 'home',
+      lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
+      liberoDesignated: { home: [], visitor: [] },
+      startTime: '18:00',
+    })
+
+  it('leaves no trace of the wrong start', () => {
+    // The whole point. Correcting first serve this way must be indistinguishable
+    // from having entered it correctly, because nothing had happened yet: no
+    // ADJUSTMENT comment on the sheet, no second SET_STARTED for the fold to
+    // disagree with itself over.
+    const wrong = [started('home')]
+    const corrected = [...dropCurrentSet(wrong), started('visitor')]
+    const clean = [started('visitor')]
+
+    expect(dropCurrentSet(wrong)).toEqual([])
+    const a = fold(setup(), corrected)
+    const b = fold(setup(), clean)
+    expect(a.serveTeam).toBe(b.serveTeam)
+    expect(a.teams.home.slots).toEqual(b.teams.home.slots)
+    expect(a.teams.visitor.slots).toEqual(b.teams.visitor.slots)
+    expect(a.teams.home.serviceTurns).toBe(b.teams.home.serviceTurns)
+    expect(a.teams.visitor.serviceTurns).toBe(b.teams.visitor.serviceTurns)
+    expect(a.teams.home.sheetRows).toEqual(b.teams.home.sheetRows)
+    expect(a.teams.visitor.sheetRows).toEqual(b.teams.visitor.sheetRows)
+  })
+
+  it('takes what was recorded after the start with it', () => {
+    const events = [
+      started('home'),
+      ev({ type: 'TIMEOUT', team: 'home' }),
+      ev({ type: 'SUBSTITUTION', team: 'home', playerIn: '2', playerOut: '4', slot: 3, exceptional: false }),
+    ]
+    expect(dropCurrentSet(events)).toEqual([])
+  })
+
+  it('keeps the sets already played', () => {
+    const events = [
+      started('home'),
+      ev({ type: 'SET_ENDED', setNumber: 1, endTime: '18:40' }),
+      started('visitor', 2),
+    ]
+    expect(dropCurrentSet(events)).toHaveLength(2)
+    expect(fold(setup(), dropCurrentSet(events)).completedSets).toHaveLength(1)
+  })
+
+  it('refuses to reach past a set that has ended', () => {
+    // The guard that matters: between sets the last SET_STARTED belongs to a set
+    // that was played. Dropping it would delete a played set from the record.
+    const events = [started('home'), ev({ type: 'SET_ENDED', setNumber: 1, endTime: '18:40' })]
+    expect(dropCurrentSet(events)).toBe(events)
+    expect(fold(setup(), dropCurrentSet(events)).completedSets).toHaveLength(1)
+  })
+
+  it('does nothing to a match with no set started', () => {
+    expect(dropCurrentSet([])).toEqual([])
   })
 })

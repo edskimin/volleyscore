@@ -44,6 +44,26 @@ function setDefaults(
       ? { home: [...last.liberoDesignated.home], visitor: [...last.liberoDesignated.visitor] }
       : { home: [...setup.home.liberoNumbers], visitor: [...setup.visitor.liberoNumbers] },
     leftTeam: last?.leftTeam ?? 'home',
+    correcting: false,
+  }
+}
+
+/**
+ * The draft for a set that has already started, so its setup can be corrected without
+ * re-entering twelve players. Everything comes from the event about to be dropped.
+ */
+function draftFromStarted(ev: SetStarted): SetDraft {
+  return {
+    setNumber: ev.setNumber,
+    lineups: { home: [...ev.lineups.home], visitor: [...ev.lineups.visitor] },
+    firstServe: ev.firstServe,
+    targetScore: ev.targetScore,
+    liberos: {
+      home: [...ev.liberoDesignated.home],
+      visitor: [...ev.liberoDesignated.visitor],
+    },
+    leftTeam: ev.leftTeam,
+    correcting: true,
   }
 }
 
@@ -356,6 +376,16 @@ export default function App() {
             onEditSetup={() => setRoute('editSetup')}
             onCloseout={goCloseout}
             onSetEnded={() => setRoute('setSetup')}
+            onReopenSetup={() => {
+              // Read the event before dropping it: it is the whole draft.
+              const started = [...record.events]
+                .reverse()
+                .find((e): e is SetStarted => e.type === 'SET_STARTED')
+              if (!started) return
+              setDraft(draftFromStarted(started))
+              store.dropCurrentSet()
+              setRoute('setSetup')
+            }}
             onAdjust={() => setRoute('adjustment')}
             onExport={() => void store.exportMatch()}
             onHome={() => setRoute('home')}

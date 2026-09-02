@@ -42,6 +42,39 @@ describe('a match is never routed somewhere it cannot render', () => {
   })
 })
 
+describe("a set's setup can be re-declared, but only before it counts", () => {
+  it('offers the way back only while the set is at nil-nil', () => {
+    // Once a point exists the setup is history and Fix lineup is the right tool. If
+    // this control survived the first rally it would delete recorded play.
+    const s = src('src/ui/InMatch.tsx')
+    expect(s).toContain(
+      'state.setInProgress && state.score.home + state.score.visitor === 0',
+    )
+    expect(s).toMatch(/\{canReopenSetup && \(/)
+  })
+
+  it('states what going back would remove, and asks twice', () => {
+    const s = src('src/ui/InMatch.tsx')
+    expect(s).toContain('droppedOnReopen > 0 && !confirmReopen')
+    expect(s).toContain('sheet-note')
+  })
+
+  it('drops the set through the reducer rule, not a local loop', () => {
+    // The rule that a SET_ENDED may never be reached past lives in one place.
+    const store = src('src/state/store.ts')
+    const body = store.slice(store.indexOf('const dropCurrentSet'))
+    expect(body).toContain('dropSetStart(prev.events)')
+    // No second copy of the rule here: the store decides nothing about what may go.
+    expect(body.slice(0, body.indexOf('}, [])'))).not.toMatch(/SET_ENDED|SET_STARTED/)
+    expect(src('src/model/reducer.ts')).toContain('export function dropCurrentSet')
+  })
+
+  it('carries the dropped set start into the draft so nothing is retyped', () => {
+    const s = src('src/App.tsx')
+    expect(s).toMatch(/draftFromStarted\(started\)[\s\S]{0,120}store\.dropCurrentSet\(\)/)
+  })
+})
+
 describe('finishing a match is an event, not navigation', () => {
   it('every route into closeout records MATCH_ENDED once', () => {
     // Recorded on one button, the other two ways in left the sheet's Match End time

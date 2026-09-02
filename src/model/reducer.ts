@@ -548,6 +548,31 @@ export function undo(events: MatchEvent[]): MatchEvent[] {
   return events.slice(0, -1)
 }
 
+/**
+ * Drop the in-progress set's SET_STARTED and everything after it, so the set's setup
+ * can be declared again. Returns the log unchanged if there is no set to drop, or if
+ * the last one started has already ended.
+ *
+ * Re-declaring rather than appending a correction is the point. A second SET_STARTED
+ * would not work: the fold reads a set's lineup from the first one it meets, so the
+ * two would disagree and the sheet would print the wrong serve order. And an
+ * ADJUSTMENT would print as a comment on the sheet, which is a mark about nothing
+ * when the set had no plays in it.
+ */
+export function dropCurrentSet(events: MatchEvent[]): MatchEvent[] {
+  let i = -1
+  for (let k = events.length - 1; k >= 0; k--) {
+    if (events[k].type === 'SET_STARTED') {
+      i = k
+      break
+    }
+  }
+  if (i === -1) return events
+  // A set that has ended is history, and nothing here may reach past a SET_ENDED.
+  if (events.slice(i).some((e) => e.type === 'SET_ENDED')) return events
+  return events.slice(0, i)
+}
+
 /** Set numbers that have been started, in order. */
 export function startedSets(events: MatchEvent[]): number[] {
   return events.filter((e) => e.type === 'SET_STARTED').map((e) => e.setNumber)

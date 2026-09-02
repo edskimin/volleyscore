@@ -25,6 +25,12 @@ export interface SetDraft {
   targetScore: number
   liberos: Record<TeamSide, string[]>
   leftTeam: TeamSide
+  /**
+   * True when this draft is re-declaring a set that had already started, reached
+   * before the first point. It changes nothing about what gets appended; it only
+   * stops the screen claiming the lineups were carried over from the last set.
+   */
+  correcting: boolean
 }
 
 interface Props {
@@ -312,10 +318,16 @@ export default function SetSetupScreen({
               Back
             </button>
             <span className="rail-title">Set {draft.setNumber}</span>
-            {draft.setNumber > 1 && (
+            {draft.correcting ? (
               <span className="rail-sub">
-                Lineups carried over from set {draft.setNumber - 1}. Change what moved.
+                Correcting the setup for set {draft.setNumber}. Nothing has been scored yet.
               </span>
+            ) : (
+              draft.setNumber > 1 && (
+                <span className="rail-sub">
+                  Lineups carried over from set {draft.setNumber - 1}. Change what moved.
+                </span>
+              )
             )}
           </div>
           <div className="rail-right">
