@@ -276,11 +276,15 @@ export default function Scoresheet({ setup, events, initialSet, onBack }: Props)
     ? ['home', 'visitor']
     : ['visitor', 'home']
 
-  const winner =
-    result?.winner ??
-    (state.score.home > state.score.visitor
-      ? ('home' as TeamSide)
-      : ('visitor' as TeamSide))
+  // A set that was ended without meeting its win condition has no winner, and the
+  // summary must not invent one.
+  const winner: TeamSide | null = result
+    ? result.winner
+    : state.score.home === state.score.visitor
+      ? null
+      : state.score.home > state.score.visitor
+        ? 'home'
+        : 'visitor'
 
   return (
     <div className="screen sheet-view">
@@ -412,7 +416,7 @@ export default function Scoresheet({ setup, events, initialSet, onBack }: Props)
               <div className="summary-body">
                 <div className="summary-line">
                   <span>Winning Team:</span>
-                  <span className="rule">{state.score.home + state.score.visitor > 0 ? setup[winner].name : ''}</span>
+                  <span className="rule">{winner ? setup[winner].name : ''}</span>
                   <span>Final Score:</span>
                   <span className="rule short">
                     {state.score[leftSide]} – {state.score[rightSide]}

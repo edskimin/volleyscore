@@ -111,8 +111,13 @@
   color: var(--text-primary); cursor: pointer;
   font-family: inherit; padding: 0;
 }
-/* Same three states as in-match: outlined means in use and inert. */
+/* Same three states as in-match. Outlined means in use and inert. Faded means
+   not selectable in this context: a designated libero is not in the six, she
+   replaces a back-row player once the set starts. Untoggle her below and she
+   becomes available again, which is what makes the fade the right state rather
+   than removing her from the row. */
 .app.set-setup .chip[data-state='placed'] { background: transparent; border-color: var(--border-strong); color: var(--text-muted); cursor: default; }
+.app.set-setup .chip[data-state='libero'] { opacity: 0.28; cursor: default; }
 .app.set-setup .libero-row { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
 .app.set-setup .lchip {
   height: 4.4cqh; padding: 0 1.4cqh; border-radius: var(--radius-chip);

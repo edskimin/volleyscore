@@ -119,7 +119,9 @@ export default function SetSetupScreen({
 
   /* Chip tap is the primary path: fill the active slot, advance. Six taps. */
   function tapChip(side: TeamSide, jersey: string) {
-    if (lineups[side].includes(jersey)) return
+    // Only a free chip enters the six. A placed player is already in, and a
+    // designated libero is not one of the six at all.
+    if (chipState(side, jersey) !== 'free') return
     const i = active[side]
     const next = [...lineups[side]]
     next[i] = jersey
@@ -140,18 +142,30 @@ export default function SetSetupScreen({
     setActive((a) => ({ ...a, [side]: 0 }))
   }
 
+  /** placed: already in the six. libero: designated, so not one of the six. */
+  function chipState(side: TeamSide, jersey: string): 'placed' | 'libero' | 'free' {
+    if (lineups[side].includes(jersey)) return 'placed'
+    if (liberos[side].includes(jersey)) return 'libero'
+    return 'free'
+  }
+
   function toggleLibero(side: TeamSide, player: string) {
     const has = liberos[side].includes(player)
+    if (has) {
+      patch({ liberos: { ...liberos, [side]: liberos[side].filter((n) => n !== player) } })
+      return
+    }
+    // A libero is not one of the six. Designating her clears her from the serve order
+    // and puts the cursor back on the hole she left.
+    const at = lineups[side].indexOf(player)
     patch({
-      liberos: {
-        ...liberos,
-        [side]: has ? liberos[side].filter((n) => n !== player) : [...liberos[side], player],
-      },
-      // Designating a libero pulls her out of the starting six if she was placed there.
-      lineups: has
-        ? lineups
-        : { ...lineups, [side]: lineups[side].map((n) => (n === player ? null : n)) },
+      liberos: { ...liberos, [side]: [...liberos[side], player] },
+      lineups:
+        at === -1
+          ? lineups
+          : { ...lineups, [side]: lineups[side].map((n, i) => (i === at ? null : n)) },
     })
+    if (at !== -1) setActive((a) => ({ ...a, [side]: at }))
   }
 
   function start() {
@@ -244,17 +258,19 @@ export default function SetSetupScreen({
         </div>
         <div className="roster">
           {roster.map((r) => {
-            const placed = lineup.includes(r.number)
+            const st = chipState(side, r.number)
             return (
               <button
                 key={r.number}
                 className="chip"
-                data-state={placed ? 'placed' : 'free'}
-                disabled={placed}
+                data-state={st}
+                disabled={st !== 'free'}
                 onClick={() => tapChip(side, r.number)}
               >
                 {snap.liberoNumbers.includes(r.number) && (
-                  <Triangle color={placed ? 'var(--text-muted)' : 'var(--text-primary)'} />
+                  <Triangle
+                    color={st === 'free' ? 'var(--text-primary)' : 'var(--text-muted)'}
+                  />
                 )}
                 {r.number}
               </button>

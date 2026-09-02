@@ -56,6 +56,12 @@ produce.
 **Make the common path the shortest one.** Six chip taps in serve order fill I–VI by
 auto-advance. Tapping a slot is correction only.
 
+**An invariant is enforced from both directions.** A designated libero is not one of
+the six, so designating her clears her from the serve order *and* fades her chip to 28
+percent so she cannot be tapped back in. Untoggling restores her, which is why fading
+is right and removing her from the row is not: she is conditionally unavailable, not
+absent, and the fade makes the toggle's effect visible.
+
 ## The in-match screen is a port
 
 `src/ui/InMatch.tsx`, `src/ui/in-match.css` and `src/ui/palette.ts` are ported from the
@@ -68,6 +74,16 @@ fails the suite.
 The layout is deliberately **not** fluid. The app is locked to a 1180 by 820 stage and
 every dimension is a share of the stage height in `cqh`. The proportions between the
 score, the court and the roster row are the design.
+
+**Ending is never a one-way door.** `MATCH_ENDED` is a state change, not a
+termination, so the in-match screen stays reachable and live afterwards and undo walks
+back through it. Closeout's "Back to match" is the cancel path. Screen transitions are
+navigated explicitly rather than rewritten by the router, because the rewrite is what
+made ending irreversible.
+
+**A set is won only if it met its win condition,** and a set played after the match is
+already decided does not change the result. Ending a set is always available to the
+operator; winning one is not.
 
 **A derived conclusion is announced, never enforced.** The app can compute that a set
 is over; only the first referee can decide it. Set and match completion appear as an

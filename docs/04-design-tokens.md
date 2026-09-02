@@ -217,6 +217,19 @@ Team-scoped buttons in the action bar carry that team's derived `rule` color as 
 border, so the operator knows which side a control belongs to without reading the
 label. Shared controls in the centre keep `--border-strong`.
 
+**Only genuine team actions belong in a team's side of the bar.** A time out is one:
+a team calls it, it counts against that team's two, and the score goes in that team's
+box on the sheet. A replay is not: it is a referee decision about the rally, and the
+mark goes in the current server's box whoever caused it. Mirroring a control that has
+no side implies a choice that does not exist. Replay and re-serve live in the overflow.
+
+**Show a budget by showing what was spent, not by counting it.** Each team's time outs
+render as two slots beside the button, each holding the score at the moment it was
+called, calling team's score first, which is exactly what the OHSAA time-out box wants.
+Filled slots are spent and empty ones remain, so remaining capacity is legible without
+a number, and the button disables at two. Prefer this shape wherever a budget has few
+enough units to display and each unit carries data worth keeping.
+
 Minimum touch target 44px. Court cells, chips, and score areas already exceed this.
 
 ## Motion
@@ -248,6 +261,12 @@ artifact.
 *Make the common path the shortest one.* Tapping six roster chips in serve order fills
 I through VI by auto-advance. Selecting a slot is for correction only. Requiring a slot
 tap before every entry would double the taps on a screen used before every set.
+
+*An invariant is enforced from both directions.* A designated libero is not one of the
+six, so designating her clears her from the serve order AND fades her chip to 28
+percent so she cannot be tapped back in. Untoggling her designation restores her, which
+is why fading is right and removing her from the row is not: she is conditionally
+unavailable, not absent, and the fade makes the toggle's effect visible.
 
 **Match setup and set setup.** Cards on `--rail-bg` with `--radius-panel`. Team
 sections use that team's color as a left edge accent or a header underline, not as a

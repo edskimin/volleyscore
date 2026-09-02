@@ -92,7 +92,10 @@ export default function Closeout({
                 <td className={`num${s.winner === 'home' ? ' won' : ''}`}>{s.score.home}</td>
                 <td className={`num${s.winner === 'visitor' ? ' won' : ''}`}>{s.score.visitor}</td>
                 <td className="num faint">{s.startTime}</td>
-                <td className="num faint">{s.endTime ?? '—'}</td>
+                <td className="num faint">
+                  {s.endTime ?? '—'}
+                  {!s.counts && <span className="faint"> extra</span>}
+                </td>
                 <td className="sheet-link">
                   <button className="btn" onClick={() => onOpenSheet(s.setNumber)}>
                     Scoresheet

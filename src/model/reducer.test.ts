@@ -525,3 +525,121 @@ describe('warnings are states, not events', () => {
     expect(fold(setup(), events).warnings).toEqual([])
   })
 })
+
+describe('set and match results', () => {
+  const endSet = (n: number, endTime: string) =>
+    ev({ type: 'SET_ENDED', setNumber: n, endTime })
+
+  it('does not count a set that was ended without being won', () => {
+    // The operator can always end a set. That is not the same as winning one, and a
+    // 0-0 set ended by mistake must not appear as a set win.
+    const events: MatchEvent[] = [setStarted('home')]
+    events.push(endSet(1, '18:05'))
+    const s = fold(setup(), events)
+    expect(s.setsWon).toEqual({ home: 0, visitor: 0 })
+    expect(s.completedSets[0]).toMatchObject({ winner: null, counts: false })
+    expect(s.matchComplete).toBe(false)
+  })
+
+  it('counts a set only once its win condition is met', () => {
+    const events: MatchEvent[] = [setStarted('home')]
+    for (let i = 0; i < 25; i++) events.push(rally('home'))
+    for (let i = 0; i < 24; i++) events.push(rally('visitor'))
+    // 25-24 is not a win: no two point lead.
+    events.push(endSet(1, '18:30'))
+    expect(fold(setup(), events).setsWon).toEqual({ home: 0, visitor: 0 })
+    expect(fold(setup(), events).completedSets[0].winner).toBeNull()
+  })
+
+  it('lets an extra set be played without changing a decided match', () => {
+    // JV teams play one for practice after the match is decided.
+    const events: MatchEvent[] = []
+    let seqSet = 0
+    const playSet = (winnerSide: TeamSide) => {
+      seqSet += 1
+      events.push(
+        ev({
+          type: 'SET_STARTED',
+          setNumber: seqSet,
+          targetScore: 25,
+          firstServe: 'home',
+          sidesSwitched: false,
+          lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
+          liberoDesignated: { home: [], visitor: [] },
+          startTime: `18:${String(seqSet).padStart(2, '0')}`,
+        }),
+      )
+      for (let i = 0; i < 25; i++) events.push(rally(winnerSide))
+      events.push(endSet(seqSet, `19:${String(seqSet).padStart(2, '0')}`))
+    }
+
+    playSet('home')
+    playSet('home')
+    playSet('home')
+    const decided = fold(setup(), events)
+    expect(decided.setsWon).toEqual({ home: 3, visitor: 0 })
+    expect(decided.matchComplete).toBe(true)
+
+    playSet('visitor')
+    const after = fold(setup(), events)
+    expect(after.setsWon).toEqual({ home: 3, visitor: 0 })
+    expect(after.completedSets).toHaveLength(4)
+    expect(after.completedSets[3]).toMatchObject({ winner: 'visitor', counts: false })
+  })
+
+  it('takes each set time from its own event, never a neighbouring one', () => {
+    const events: MatchEvent[] = [
+      ev({
+        type: 'SET_STARTED',
+        setNumber: 1,
+        targetScore: 25,
+        firstServe: 'home',
+        sidesSwitched: false,
+        lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
+        liberoDesignated: { home: [], visitor: [] },
+        startTime: '18:02',
+      }),
+    ]
+    for (let i = 0; i < 25; i++) events.push(rally('home'))
+    events.push(endSet(1, '18:27'))
+    events.push(
+      ev({
+        type: 'SET_STARTED',
+        setNumber: 2,
+        targetScore: 25,
+        firstServe: 'visitor',
+        sidesSwitched: false,
+        lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
+        liberoDesignated: { home: [], visitor: [] },
+        startTime: '18:34',
+      }),
+    )
+    for (let i = 0; i < 25; i++) events.push(rally('visitor'))
+    events.push(endSet(2, '19:01'))
+
+    const sets = fold(setup(), events).completedSets
+    expect(sets.map((s) => [s.setNumber, s.startTime, s.endTime])).toEqual([
+      [1, '18:02', '18:27'],
+      [2, '18:34', '19:01'],
+    ])
+  })
+})
+
+describe('ending a match is not a one-way door', () => {
+  it('undoes MATCH_ENDED like any other event', () => {
+    const events: MatchEvent[] = [setStarted('home')]
+    for (let i = 0; i < 25; i++) events.push(rally('home'))
+    events.push(ev({ type: 'SET_ENDED', setNumber: 1, endTime: '18:30' }))
+    events.push(ev({ type: 'MATCH_ENDED', endTime: '18:31' }))
+
+    const ended = fold(setup({ format: 'best_of_3' }), events)
+    expect(ended.matchComplete).toBe(true)
+
+    // Dropping the last event puts the match back exactly where it was. Nothing is
+    // locked or destroyed by ending it.
+    const backedOut = fold(setup({ format: 'best_of_3' }), undo(events))
+    expect(backedOut.completedSets).toHaveLength(1)
+    expect(backedOut.setsWon).toEqual({ home: 1, visitor: 0 })
+    expect(backedOut.score).toEqual({ home: 25, visitor: 0 })
+  })
+})

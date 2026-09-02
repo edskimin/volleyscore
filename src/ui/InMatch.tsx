@@ -29,6 +29,7 @@ interface Props {
   onSheet: () => void
   onEditSetup: () => void
   onCloseout: () => void
+  onSetEnded: () => void
   onAdjust: () => void
   onExport: () => void
   onHome: () => void
@@ -377,15 +378,15 @@ export default function InMatch(props: Props) {
               className="btn btn-primary"
               hidden={!matchOver && setWinner === null}
               style={{ padding: '0.9cqh 1.6cqh' }}
-              onClick={() =>
-                matchOver
-                  ? (append({ type: 'MATCH_ENDED', endTime: endTime() }), props.onCloseout())
-                  : append({
-                      type: 'SET_ENDED',
-                      setNumber: state.currentSet,
-                      endTime: endTime(),
-                    })
-              }
+              onClick={() => {
+                if (matchOver) {
+                  append({ type: 'MATCH_ENDED', endTime: endTime() })
+                  props.onCloseout()
+                } else {
+                  append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
+                  props.onSetEnded()
+                }
+              }}
             >
               {matchOver ? 'end match' : 'end set'}
             </button>
@@ -516,6 +517,7 @@ export default function InMatch(props: Props) {
                     onClick={() => {
                       setOverlay(null)
                       append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
+                      props.onSetEnded()
                     }}
                   >
                     End set {state.currentSet} manually

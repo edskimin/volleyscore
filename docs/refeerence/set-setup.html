@@ -161,8 +161,13 @@ body { display: flex; user-select: none; -webkit-user-select: none; touch-action
   font-size: var(--type-chip); font-variant-numeric: tabular-nums;
   color: var(--text-primary); cursor: pointer;
 }
-/* Same three states as in-match: outlined means in use and inert. */
+/* Same three states as in-match. Outlined means in use and inert. Faded means
+   not selectable in this context: a designated libero is not in the six, she
+   replaces a back-row player once the set starts. Untoggle her below and she
+   becomes available again, which is what makes the fade the right state rather
+   than removing her from the row. */
 .chip[data-state="placed"] { background: transparent; border-color: var(--border-strong); color: var(--text-muted); cursor: default; }
+.chip[data-state="libero"] { opacity: 0.28; cursor: default; }
 .libero-row { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
 .lchip {
   height: 4.4cqh; padding: 0 1.4cqh; border-radius: var(--radius-chip);
@@ -312,9 +317,11 @@ function renderCard(side) {
 
   var chips = t.roster.map(function(j) {
     var placed = t.lineup.indexOf(j) !== -1;
+    var isLib  = t.liberoActive.indexOf(j) !== -1;
+    var state  = placed ? "placed" : (isLib ? "libero" : "free");
     var lib = t.liberos.indexOf(j) !== -1
-      ? triangle(placed ? "var(--text-muted)" : "var(--text-primary)") : "";
-    return '<div class="chip" data-chip="' + side + ":" + j + '" data-state="' + (placed ? "placed" : "free") + '">' +
+      ? triangle(state === "free" ? "var(--text-primary)" : "var(--text-muted)") : "";
+    return '<div class="chip" data-chip="' + side + ":" + j + '" data-state="' + state + '">' +
            lib + j + "</div>";
   }).join("");
 
@@ -373,7 +380,7 @@ function bind() {
   /* Chip tap is the primary path: fill the active slot, advance. Six taps. */
   document.querySelectorAll("[data-chip]").forEach(function(el) {
     el.onclick = function() {
-      if (el.dataset.state === "placed") return;
+      if (el.dataset.state !== "free") return;
       var parts = el.dataset.chip.split(":"), side = parts[0], j = parts[1], t = S[side];
       var i = S.active[side];
       t.lineup[i] = j;
@@ -395,7 +402,15 @@ function bind() {
     el.onclick = function() {
       var parts = el.dataset.lib.split(":"), t = S[parts[0]], j = parts[1];
       var k = t.liberoActive.indexOf(j);
-      if (k === -1) t.liberoActive.push(j); else t.liberoActive.splice(k, 1);
+      if (k === -1) {
+        t.liberoActive.push(j);
+        /* A libero is not one of the six. Designating her clears her from the
+           serve order and puts the cursor back on the hole she left. */
+        var at = t.lineup.indexOf(j);
+        if (at !== -1) { t.lineup[at] = null; S.active[parts[0]] = at; }
+      } else {
+        t.liberoActive.splice(k, 1);
+      }
       render();
     };
   });

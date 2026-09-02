@@ -219,7 +219,7 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
   }
 
   const setsNeeded = setup.format === 'best_of_5' ? 3 : 2
-  let currentSetMeta: Omit<SetResult, 'winner' | 'endTime'> | null = null
+  let currentSetMeta: Omit<SetResult, 'winner' | 'counts' | 'endTime'> | null = null
 
   for (const ev of events) {
     switch (ev.type) {
@@ -390,13 +390,28 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
       }
 
       case 'SET_ENDED': {
-        const winner: TeamSide = state.score.home > state.score.visitor ? 'home' : 'visitor'
-        state.setsWon[winner] += 1
+        // A set is won only if it met its win condition. Ending a set is always
+        // available to the operator; an abandoned or mis-ended set is not a set win.
+        const won = setIsWon(state)
+        const winner: TeamSide | null = won
+          ? state.score.home > state.score.visitor
+            ? 'home'
+            : 'visitor'
+          : null
+
+        // An extra set played after the match is already decided does not change the
+        // result. JV teams play one for practice.
+        const alreadyDecided =
+          state.setsWon.home >= setsNeeded || state.setsWon.visitor >= setsNeeded
+        const counts = winner !== null && !alreadyDecided
+        if (counts && winner) state.setsWon[winner] += 1
+
         state.completedSets.push({
           setNumber: currentSetMeta?.setNumber ?? ev.setNumber,
           targetScore: currentSetMeta?.targetScore ?? state.targetScore,
           score: { ...state.score },
           winner,
+          counts,
           startTime: currentSetMeta?.startTime ?? '',
           endTime: ev.endTime,
         })

@@ -245,7 +245,17 @@ export interface SetResult {
   setNumber: number
   targetScore: number
   score: Record<TeamSide, number>
-  winner: TeamSide
+  /**
+   * Null when the set was ended without meeting its win condition. Ending a set is
+   * something the operator can always do; winning one is not, and an abandoned set
+   * is not a set win.
+   */
+  winner: TeamSide | null
+  /**
+   * Whether this set counts towards the match result. False for a set played after
+   * the match was already decided, which JV teams do for practice.
+   */
+  counts: boolean
   startTime: string
   endTime: string | null
 }

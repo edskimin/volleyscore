@@ -113,12 +113,10 @@ export default function App() {
     : store.state?.matchComplete
       ? 'closeout'
       : 'setSetup'
-  let view: Route = route ?? (store.record ? resumed : 'home')
-  // A finished set drops back to set setup for the next one rather than dead-ending;
-  // a finished match drops to closeout instead of offering a set that will not be played.
-  if (view === 'inMatch' && store.state && !store.state.setInProgress) {
-    view = store.state.matchComplete ? 'closeout' : 'setSetup'
-  }
+  // Transitions are explicit, not rewritten here. MATCH_ENDED is a state change, not
+  // a termination: the in-match screen stays reachable and live afterwards so undo can
+  // walk back through it, which a rewrite to closeout made impossible.
+  const view: Route = route ?? (store.record ? resumed : 'home')
 
 
   if (view === 'matchSetup') {
@@ -182,7 +180,11 @@ export default function App() {
             onDraftChange={setDraft}
             theme={theme}
             onToggleTheme={toggleTheme}
-            onBack={() => setRoute('home')}
+            onBack={() =>
+              setRoute(
+                state.completedSets.length > 0 || state.setInProgress ? 'inMatch' : 'home',
+              )
+            }
             onEditSetup={() => setRoute('editSetup')}
             onSheet={() => {
               setSheetSet(undefined)
@@ -233,7 +235,7 @@ export default function App() {
               setSheetFrom('closeout')
               setRoute('sheet')
             }}
-            onBackToMatch={() => setRoute(state.setInProgress ? 'inMatch' : 'setSetup')}
+            onBackToMatch={() => setRoute('inMatch')}
           />
         </div>
       )
@@ -273,6 +275,7 @@ export default function App() {
             }}
             onEditSetup={() => setRoute('editSetup')}
             onCloseout={() => setRoute('closeout')}
+            onSetEnded={() => setRoute('setSetup')}
             onAdjust={() => setRoute('adjustment')}
             onExport={() => void store.exportMatch()}
             onHome={() => setRoute('home')}
