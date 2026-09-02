@@ -270,7 +270,12 @@ export default function InMatch(props: Props) {
     const t = state.teams[side]
     const snap = setup[side]
     const p = palettes[side]
-    const serving = state.serveTeam === side
+    // Between sets nobody is serving, so nobody reads as serving. Reusing the state
+    // language rather than adding a between-sets treatment is the point: base means
+    // serving and dim means not serving, so both panels going dim already says "no
+    // rally is happening" in words the operator has learned. All three serve
+    // indications come off this one value: panel tint, inverted cell, serve line.
+    const serving = live && state.serveTeam === side
     const roster = [...state.rosters[side]].sort((a, b) => Number(a.number) - Number(b.number))
     const selCell = sel?.kind === 'cell' && sel.side === side ? sel.value : null
     const selChip = sel?.kind === 'chip' && sel.side === side ? sel.value : null
@@ -417,8 +422,10 @@ export default function InMatch(props: Props) {
               {state.score[side]}
             </span>
             {/* Third of three serve indications: panel tint, inverted cell, this line. */}
+            {/* Blank between sets, not "receiving": neither team is. The line keeps
+                its height so the score does not shift when it empties. */}
             <span className="serve-line">
-              {serving ? (
+              {!live ? null : serving ? (
                 <>
                   <BallIcon color={p.ink} />
                   <span style={{ color: p.ink }}>

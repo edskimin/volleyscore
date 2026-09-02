@@ -204,6 +204,9 @@ body.stage-host #root { display: flex; }
   gap: var(--s1);
   margin-top: var(--s2);
   font-size: var(--type-body);
+  /* The line goes empty between sets. The score block centres its contents, so
+     without a reserved line box the score would slide down half a line. */
+  min-height: 1lh;
 }
 .app.in-match .serve-line svg { width: 2.5cqh; height: 2.5cqh; }
 

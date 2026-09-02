@@ -77,4 +77,20 @@ describe('nothing is scored into a set that is not running', () => {
   it('offers the way forward instead of a control it cannot honour', () => {
     expect(src('src/ui/InMatch.tsx')).toContain("label: 'start next set'")
   })
+
+  it('says so in the serve-state language rather than a new treatment', () => {
+    // Base means serving, dim means not serving. Between sets nobody is serving, so
+    // both panels go dim and the screen loses its centre of gravity, which is what
+    // "no rally is happening" already looks like. Dimming by any other means would
+    // have collided with a meaning the operator has learned. One value drives all
+    // three serve indications: panel tint, inverted cell, serve line.
+    const s = src('src/ui/InMatch.tsx')
+    expect(s).toContain('const serving = live && state.serveTeam === side')
+    expect(s).toContain('const isServer = serving && courtPos === 1')
+    expect(s).toContain('style={{ background: serving ? p.base : p.dim }}')
+    // Blank, not "receiving": neither team is.
+    expect(s).toContain('{!live ? null : serving ? (')
+    // The line keeps its box so the centred score does not shift when it empties.
+    expect(src('src/ui/in-match.css')).toMatch(/\.serve-line \{[^}]*min-height: 1lh/s)
+  })
 })

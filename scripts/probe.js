@@ -7,41 +7,104 @@
  *   colorProbe()   asserts nothing renders a color outside the sanctioned set,
  *                  that every warning mark is amber and thick enough to find, and
  *                  that no layer holds more than one primary button
+ *   probeAll()     runs the in-match three and reports each one's counts
  *
- * Both were written because a defect got past a screenshot: the first because an
- * earlier port put the hint in the layout flow, the second because a green check mark
- * shipped on the closeout screen. Run them after any change to the in-match screen.
+ * These were written because defects got past a screenshot: the hint sat in the
+ * layout flow, and a green check mark shipped on the closeout screen. Run them after
+ * any change to the in-match screen.
+ *
+ * EVERY PROBE ASSERTS A MINIMUM NUMBER OF CHECKS PERFORMED. See `enough` below. A
+ * probe that iterates over query results reports success when the query matches
+ * nothing, so a rename silently turns a guard into a rubber stamp. Read `counts` and
+ * `short`, not just `pass` — though `pass` already includes them.
  */
+
+/* Every probe asserts a MINIMUM number of checks performed, not only that the checks
+   it ran passed. previewProbe queried .card[data-side] after a rename made it
+   data-pos: it matched no cards, ran zero checks and reported pass, because
+   [].every() is true. It had been passing vacuously for several commits. A guard that
+   reports success for having done nothing is worse than no guard, because it buys
+   confidence that nothing is wrong.
+   Any probe that iterates over query results can fail this way, so every one of them
+   now declares what it must have seen. `enough` is folded into `pass` rather than
+   returned beside it, because a separate field is a field a caller can forget. */
+function enough(counts) {
+  const short = Object.entries(counts)
+    .filter(([, c]) => c.got < c.min)
+    .map(([k, c]) => `${k}: ${c.got} of ${c.min} expected`)
+  return { ok: short.length === 0, short }
+}
 
 /* Nothing that can appear mid-match may displace the court: a tap target that moves
    is a mis-recorded rally. Measures with an overlay OPEN and CLOSED. */
 async function layoutProbe() {
   const app = document.querySelector('.app')
-  const snap = () => ({
-    cellY: Math.round(document.querySelector('.cell').getBoundingClientRect().top),
-    courtH: Math.round(document.querySelector('.court-area').getBoundingClientRect().height),
-    overflows: app.scrollHeight > app.clientHeight,
-  })
+  /* Reads nothing it has not found. Dereferencing straight through a query meant a
+     renamed class threw a TypeError from inside the probe, so the count below could
+     never actually report it: an assertion that can never fire is the same defect as
+     one that always passes. */
+  const box = (sel) => {
+    const el = typeof sel === 'string' ? document.querySelector(sel) : sel
+    return el ? el.getBoundingClientRect() : null
+  }
+  const snap = () => {
+    const cell = box('.cell')
+    const area = box('.court-area')
+    return {
+      cellY: cell ? Math.round(cell.top) : null,
+      courtH: area ? Math.round(area.height) : null,
+      overflows: app ? app.scrollHeight > app.clientHeight : false,
+    }
+  }
   const more = [...document.querySelectorAll('.bar-group.centre .btn')][2]
+  if (!app || !more) {
+    return {
+      counts: { app: { got: app ? 1 : 0, min: 1 }, overflowButton: { got: more ? 1 : 0, min: 1 } },
+      short: ['the screen this probe measures is not on screen'],
+      pass: false,
+    }
+  }
+
+  /* Start from a known state. An overlay left open by a previous run would make the
+     first click CLOSE it, so the probe would compare the court against itself, find
+     nothing moved, and then fail on a sheet that is no longer there. */
+  const shown = () => [...document.querySelectorAll('.sheet')].find((el) => !el.hidden)
+  if (shown()) {
+    document.querySelector('.scrim').click()
+    await new Promise((r) => setTimeout(r, 250))
+  }
 
   const closed = snap()
   more.click()
   await new Promise((r) => setTimeout(r, 300))
   const open = snap()
-  const sheet = [...document.querySelectorAll('.sheet')].find((s) => !s.hidden)
+  const sheet = shown()
   const ab = app.getBoundingClientRect()
-  const sb = sheet.getBoundingClientRect()
-  more.click()
+  const sb = sheet ? sheet.getBoundingClientRect() : { width: 0, height: 0 }
+  if (sheet) more.click()
+
+  /* "Nothing moved" means nothing if nothing opened. If the overflow button moved in
+     the bar, this probe would compare the court against itself and pass. */
+  const counts = {
+    cells: { got: document.querySelectorAll('.cell').length, min: 12 },
+    courtArea: { got: closed.courtH === null ? 0 : 1, min: 1 },
+    sheetOpened: { got: sheet && sb.width > 0 && sb.height > 0 ? 1 : 0, min: 1 },
+  }
+  const en = enough(counts)
 
   return {
     closed,
     open,
+    counts,
+    short: en.short,
     pass:
+      en.ok &&
       closed.cellY === open.cellY &&
       closed.courtH === open.courtH &&
       !closed.overflows &&
       !open.overflows &&
       getComputedStyle(sheet).position === 'absolute' &&
+      // sheet is non-null whenever en.ok, which is evaluated first.
       sb.top >= ab.top && sb.bottom <= ab.bottom &&
       sb.left >= ab.left && sb.right <= ab.right,
   }
@@ -152,17 +215,47 @@ function colorProbe(teamHexes) {
     return scrimOpen ? inSheet : !inSheet
   })
 
+  /* Three ways this probe could report success for having done nothing:
+     - `.app` renamed, so the scan sees no elements and finds no violations;
+     - a mark class renamed, so no mark is inspected and none can fail;
+     - `.btn-primary` renamed, so no layer ever holds more than one.
+     The mark minimum is conditional because zero warnings is a legitimate state. The
+     app renders every warning twice, as a mark on the object and as text in the
+     overflow, and those two must agree: if the overflow lists warnings, at least one
+     mark must exist to inspect. The overflow's list is in the DOM even while the
+     sheet is hidden, so this costs nothing and needs no interaction. */
+  const warningsListed = document.querySelectorAll('.app .sheet-warnings div').length
+  const counts = {
+    // A real in-match or set-setup stage scans ~200 elements.
+    scanned: { got: document.querySelectorAll('.app, .app *').length, min: 50 },
+    markChecks: { got: marks.length, min: warningsListed > 0 ? 1 : 0 },
+    // Counted including hidden ones: the in-match primary is hidden mid-set, but the
+    // element is always rendered, so zero means the selector went stale.
+    primaryElements: {
+      got: document.querySelectorAll('.btn-primary, .btn.primary').length,
+      min: 1,
+    },
+  }
+  const en = enough(counts)
+
   return {
     theme: document.documentElement.dataset.theme,
-    scanned: document.querySelectorAll('.app, .app *').length,
+    counts,
+    short: en.short,
+    scanned: counts.scanned.got,
     violations: bad.length,
     detail: bad,
+    warningsListed,
     markChecks: marks.length,
     markFailures: marks.filter((m) => !m.ok),
     layer: scrimOpen ? 'sheet' : 'base',
     primariesInLayer: primaries.length,
     primaryLabels: primaries.map((p) => p.textContent.trim()),
-    primaryPass: primaries.length <= 1,
+    pass:
+      en.ok &&
+      bad.length === 0 &&
+      marks.every((m) => m.ok) &&
+      primaries.length <= 1,
   }
 }
 
@@ -177,8 +270,9 @@ async function anchorProbe() {
      side a team occupies is now a per-set fact, so the probe must not assume one. */
   const sideOfTeam = (name) => {
     const panel = [...document.querySelectorAll('.panel')].find(
-      (p) => p.getAttribute('aria-label') === name,
+      (el) => el.getAttribute('aria-label') === name,
     )
+    if (!panel) return null
     const a = app.getBoundingClientRect()
     const p = panel.getBoundingClientRect()
     return p.left - a.left < a.right - p.right ? 'left' : 'right'
@@ -191,20 +285,32 @@ async function anchorProbe() {
     const buttons = [...document.querySelectorAll('.sheet .btn')].filter((b) =>
       b.textContent.trim().startsWith('Add player to'),
     )
+    // Reported, not thrown: a renamed control must show up as a shortfall in the
+    // count below, not as a TypeError from inside the probe.
+    if (!buttons[i]) break
     const team = buttons[i].textContent.trim().replace(/^Add player to\s*/, '')
     buttons[i].click()
     await new Promise((r) => setTimeout(r, 250))
 
+    const opened = document.querySelector('.sheet:not([hidden])')
+    if (!opened) break
     const a = app.getBoundingClientRect()
-    const s = document.querySelector('.sheet:not([hidden])').getBoundingClientRect()
+    const s = opened.getBoundingClientRect()
     const anchored = s.left - a.left < a.right - s.right ? 'left' : 'right'
     const expected = sideOfTeam(team)
-    results.push({ team, expected, anchored, ok: anchored === expected })
+    results.push({ team, expected, anchored, ok: expected !== null && anchored === expected })
 
     document.querySelector('.scrim').click()
     await new Promise((r) => setTimeout(r, 200))
   }
-  return { results, pass: results.every((r) => r.ok) }
+  // One per team. A team-scoped sheet whose control was renamed drops out of the
+  // loop rather than throwing, and shows up here as a shortfall.
+  const counts = {
+    anchorChecks: { got: results.length, min: 2 },
+    sidesResolved: { got: results.filter((r) => r.expected !== null).length, min: 2 },
+  }
+  const en = enough(counts)
+  return { results, counts, short: en.short, pass: en.ok && results.every((r) => r.ok) }
 }
 
 
@@ -255,11 +361,33 @@ function previewProbe() {
       })
     })
   }
+  // Two cards, six positions each. Anything less means the probe lost the screen.
+  const counts = { previewChecks: { got: rows.length, min: 12 } }
+  const en = enough(counts)
   return {
     checks: rows.length,
+    counts,
+    short: en.short,
     firstServe,
     failures: rows.filter((r) => !r.ok),
-    // Two cards, six positions each. Anything less means the probe lost the screen.
-    pass: rows.length === 12 && rows.every((r) => r.ok),
+    pass: en.ok && rows.every((r) => r.ok),
+  }
+}
+
+
+/* Run the in-match probes together. Four hand-run probes is three chances to skip
+   one, and the one skipped is the one that would have caught it. */
+async function probeAll(teamHexes) {
+  const out = {
+    layout: await layoutProbe(),
+    anchor: await anchorProbe(),
+    color: colorProbe(teamHexes),
+  }
+  return {
+    ...out,
+    counts: Object.fromEntries(
+      Object.entries(out).map(([k, v]) => [k, { pass: v.pass, ...v.counts }]),
+    ),
+    pass: Object.values(out).every((v) => v.pass),
   }
 }
