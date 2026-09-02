@@ -4,6 +4,7 @@ import {
   fold,
   foldThroughSet,
   initialPosition,
+  isDecidingSet,
   rotatedPosition,
   servingSlotIndex,
   undo,
@@ -442,8 +443,46 @@ describe('adjustment', () => {
     expect(s.teams.home.comments).toContain('(2-0) fixed slot IV')
   })
 
-  it('moves only the serve pointer when no team is named', () => {
+  it('re-seats BOTH teams when first serve is corrected before any rally', () => {
+    // Recorded as home serving, corrected to visitor. Both teams were seated from the
+    // wrong answer: home took the serving seats it was not entitled to, and visitor
+    // took the receiving seats. Moving the pointer alone would leave every player on
+    // the floor one position out for the whole set.
     const events: MatchEvent[] = [setStarted('home')]
+    events.push(
+      ev({
+        type: 'ADJUSTMENT',
+        team: null,
+        slotAssignments: null,
+        serveTeam: 'visitor',
+        serveSlot: null,
+        liberoState: null,
+        countAgainstSubs: false,
+        note: '(0-0) first serve was recorded for the wrong team',
+      }),
+    )
+    const corrected = fold(setup(), events)
+
+    // Identical to having recorded visitor first serve in the first place.
+    const clean = fold(setup(), [setStarted('visitor')])
+    for (const side of ['home', 'visitor'] as TeamSide[]) {
+      expect(corrected.teams[side].slots.map((x) => x.position)).toEqual(
+        clean.teams[side].slots.map((x) => x.position),
+      )
+      // The opening service turn is what the pen color counts from, so it moves too.
+      expect(corrected.teams[side].serviceTurns).toBe(clean.teams[side].serviceTurns)
+    }
+    expect(corrected.serveTeam).toBe('visitor')
+    expect(servingSlotIndex(corrected.teams.visitor)).toBe(0)
+    // Nobody moved slots; only where those slots stand changed.
+    expect(corrected.teams.home.slots.map((x) => x.current)).toEqual(HOME_LINEUP)
+  })
+
+  it('moves only the pointer once a rally has been recorded', () => {
+    // The seating is history by then. Positions are corrected explicitly through
+    // slotAssignments, not inferred from a pointer move.
+    const events: MatchEvent[] = [setStarted('home'), rally('home')]
+    const before = fold(setup(), events)
     events.push(
       ev({
         type: 'ADJUSTMENT',
@@ -453,13 +492,15 @@ describe('adjustment', () => {
         serveSlot: 0,
         liberoState: null,
         countAgainstSubs: false,
-        note: '(0-0) first serve was recorded for the wrong team',
+        note: '(1-0) serve was on the wrong team',
       }),
     )
     const s = fold(setup(), events)
     expect(s.serveTeam).toBe('visitor')
     expect(servingSlotIndex(s.teams.visitor)).toBe(0)
-    expect(s.teams.home.slots.map((x) => x.current)).toEqual(HOME_LINEUP)
+    expect(s.teams.home.slots.map((x) => x.position)).toEqual(
+      before.teams.home.slots.map((x) => x.position),
+    )
   })
 
   it('can put a libero back on court without counting a substitution', () => {
@@ -808,5 +849,70 @@ describe('a flip corrects the whole set, not the rest of it', () => {
     )
     expect(foldThroughSet(setup(), events, 1)!.leftTeam).toBe('visitor')
     expect(foldThroughSet(setup(), events, 2)!.leftTeam).toBe('home')
+  })
+})
+
+
+// --- Format ----------------------------------------------------------------
+
+describe('the format decides the result, not the lead', () => {
+  /** Win `n` sets for `side`, each 25-0, then end them. */
+  function setsWon(n: number, side: TeamSide, format: MatchSetup['format']) {
+    const events: MatchEvent[] = []
+    for (let i = 1; i <= n; i++) {
+      events.push(
+        ev({
+          type: 'SET_STARTED',
+          setNumber: i,
+          targetScore: 25,
+          firstServe: side,
+          leftTeam: 'home',
+          lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
+          liberoDesignated: { home: [], visitor: [] },
+          startTime: '18:00',
+        }),
+      )
+      for (let k = 0; k < 25; k++) events.push(rally(side))
+      events.push(ev({ type: 'SET_ENDED', setNumber: i, endTime: '18:40' }))
+    }
+    return fold(setup({ format }), events)
+  }
+
+  it('does not complete a best of five at two sets to nil', () => {
+    // The lead is 2-0 and unequal, which is all "sets won differ" ever knew. A
+    // closeout that reads a difference would name a winner and mark the match done
+    // three sets early, on the artifact that gets kept.
+    const s = setsWon(2, 'home', 'best_of_5')
+    expect(s.setsWon).toEqual({ home: 2, visitor: 0 })
+    expect(s.matchComplete).toBe(false)
+  })
+
+  it('completes a best of three at two sets to nil', () => {
+    expect(setsWon(2, 'home', 'best_of_3').matchComplete).toBe(true)
+  })
+
+  it('completes a best of five only at three', () => {
+    expect(setsWon(3, 'home', 'best_of_5').matchComplete).toBe(true)
+  })
+})
+
+describe('a deciding set is a standing, not a set number', () => {
+  it('is the set both teams can win the match with', () => {
+    expect(isDecidingSet('best_of_5', { home: 2, visitor: 2 })).toBe(true)
+    expect(isDecidingSet('best_of_3', { home: 1, visitor: 1 })).toBe(true)
+  })
+
+  it('is not a set only one team can win the match with', () => {
+    expect(isDecidingSet('best_of_5', { home: 2, visitor: 1 })).toBe(false)
+    expect(isDecidingSet('best_of_5', { home: 1, visitor: 1 })).toBe(false)
+  })
+
+  it('does not care how many sets were started', () => {
+    // An abandoned 0-0 set and an extra set both add to the count of sets started
+    // without adding to either team's wins, so set five may be the seventh started
+    // and the seventh may be the deciding one. Only the standing decides.
+    const won = { home: 2, visitor: 2 }
+    expect(isDecidingSet('best_of_5', won)).toBe(true)
+    expect(isDecidingSet('best_of_5', { home: 2, visitor: 1 })).toBe(false)
   })
 })

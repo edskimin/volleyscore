@@ -42,6 +42,26 @@ export function initialPosition(slot: SlotIndex, serving: boolean): CourtPositio
   return serving ? ((slot + 1) as CourtPosition) : (((slot + 1) % 6) + 1) as CourtPosition
 }
 
+/** Sets required to win the match. The one place the format is read as a number. */
+export function setsNeededFor(format: MatchSetup['format']): number {
+  return format === 'best_of_5' ? 3 : 2
+}
+
+/**
+ * A deciding set is one both teams can win the match with, which is a fact about the
+ * standing, not about the set's number. Set numbers count every set that was started,
+ * so one abandoned at 0-0 shifts them all and set five may not be the fifth set
+ * played. This only chooses a default target score the operator can override, but a
+ * deciding set plays to 15 and the default should be right.
+ */
+export function isDecidingSet(
+  format: MatchSetup['format'],
+  setsWon: Record<TeamSide, number>,
+): boolean {
+  const needed = setsNeededFor(format)
+  return setsWon.home === needed - 1 && setsWon.visitor === needed - 1
+}
+
 export function servingSlotIndex(team: TeamState): SlotIndex {
   const i = team.slots.findIndex((s) => s.position === 1)
   return i as SlotIndex
@@ -218,7 +238,7 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
     warnings: [],
   }
 
-  const setsNeeded = setup.format === 'best_of_5' ? 3 : 2
+  const setsNeeded = setsNeededFor(setup.format)
   let currentSetMeta: Omit<SetResult, 'winner' | 'counts' | 'endTime'> | null = null
 
   for (const ev of events) {
@@ -373,7 +393,32 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
             )
           }
         }
-        if (ev.serveTeam) state.serveTeam = ev.serveTeam
+        if (ev.serveTeam && ev.serveTeam !== state.serveTeam) {
+          const corrected = ev.serveTeam
+          // Before a single rally, first serve is not a pointer, it is the seating.
+          // If it was recorded for the wrong team then BOTH teams were seated wrong:
+          // the team wrongly marked as serving took position N where it needed N+1,
+          // and the receiver took N+1 where it needed N. Moving the pointer alone
+          // would leave every player on the floor one position out, so re-seat both
+          // from the corrected first serve. Once a rally exists the seating is
+          // history, so the pointer moves alone and the operator places players
+          // explicitly through slotAssignments.
+          const seated = state.setInProgress && state.score.home + state.score.visitor === 0
+          state.serveTeam = corrected
+          if (seated) {
+            for (const side of ['home', 'visitor'] as TeamSide[]) {
+              const team = state.teams[side]
+              const serving = side === corrected
+              for (const [i, slot] of team.slots.entries()) {
+                slot.position = initialPosition(i as SlotIndex, serving)
+              }
+              // The opening turn was credited to the wrong team too, and that is what
+              // the pen color counts from.
+              team.serviceTurns = serving ? 1 : 0
+              recomputePass(team)
+            }
+          }
+        }
         if (ev.serveSlot !== null) {
           // Move the serve pointer by rotating until the named slot is at position 1.
           const team = state.teams[state.serveTeam]

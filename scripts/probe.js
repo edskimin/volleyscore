@@ -215,36 +215,51 @@ async function anchorProbe() {
    what is rendered rather than what the code intends. */
 function previewProbe() {
   const RN = ['I', 'II', 'III', 'IV', 'V', 'VI']
-  const GRID = { home: [5, 4, 6, 3, 1, 2], visitor: [2, 1, 3, 6, 4, 5] }
+  /* Keyed by SCREEN POSITION, like the screen itself. This probe was keyed by team
+     and queried .card[data-side] after the left/right change renamed it to
+     data-pos, so it matched no cards, ran zero checks, and reported pass because
+     [].every() is true. A probe that measures nothing is worse than no probe, so
+     the expected count is asserted below. */
+  const GRID = { left: [5, 4, 6, 3, 1, 2], right: [2, 1, 3, 6, 4, 5] }
   const positionOf = (serves, slotIndex) => (serves ? slotIndex + 1 : ((slotIndex + 1) % 6) + 1)
 
-  const firstServe = [...document.querySelectorAll('.controls .control')]
-    .find((c) => /first serve/i.test(c.textContent))
-    ?.querySelector('button[aria-pressed="true"]')?.textContent.trim()
+  const pressed = (label) =>
+    [...document.querySelectorAll('.controls .control')]
+      .find((c) => new RegExp(label, 'i').test(c.textContent))
+      ?.querySelector('button[aria-pressed="true"]')
+      ?.textContent.trim()
+  const firstServe = pressed('first serve')
 
   const rows = []
-  for (const card of document.querySelectorAll('.card[data-side]')) {
-    const side = card.dataset.side
-    const serves = (setup[side]?.name ?? '') === firstServe
+  for (const card of document.querySelectorAll('.card[data-pos]')) {
+    const pos = card.dataset.pos
+    // The team standing here, read off the card rather than assumed from the side.
+    const name = card.querySelector('.card-name').textContent.trim()
+    const serves = name === firstServe
     const lineup = [...card.querySelectorAll('.order .slot')].map((s) => {
       const n = s.querySelector('.slot-num')
       return n ? n.textContent.trim() : null
     })
     const cells = [...card.querySelectorAll('.court .pcell')]
-    GRID[side].forEach((pos, i) => {
+    GRID[pos].forEach((court, i) => {
       // Which serve-order slot should stand at this court position?
       let expectIdx = -1
-      for (let k = 0; k < 6; k++) if (positionOf(serves, k) === pos) expectIdx = k
+      for (let k = 0; k < 6; k++) if (positionOf(serves, k) === court) expectIdx = k
       const shownRn = cells[i].querySelector('.pcell-rn').textContent.trim()
       const shownNum = cells[i].querySelector('.pcell-num').textContent.trim()
-      const expectNum = lineup[expectIdx] ?? '—'
       rows.push({
-        side, pos, serves,
+        pos, name, court, serves,
         expectRn: RN[expectIdx], shownRn,
-        expectNum, shownNum,
-        ok: shownRn === RN[expectIdx] && shownNum === expectNum,
+        expectNum: lineup[expectIdx] ?? '\u2014', shownNum,
+        ok: shownRn === RN[expectIdx] && shownNum === (lineup[expectIdx] ?? '\u2014'),
       })
     })
   }
-  return { checks: rows.length, failures: rows.filter((r) => !r.ok), pass: rows.every((r) => r.ok) }
+  return {
+    checks: rows.length,
+    firstServe,
+    failures: rows.filter((r) => !r.ok),
+    // Two cards, six positions each. Anything less means the probe lost the screen.
+    pass: rows.length === 12 && rows.every((r) => r.ok),
+  }
 }

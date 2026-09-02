@@ -283,15 +283,11 @@ export default function Scoresheet({ setup, events, initialSet, onBack }: Props)
   const leftSide: TeamSide = state.leftTeam
   const rightSide: TeamSide = leftSide === 'home' ? 'visitor' : 'home'
 
-  // A set that was ended without meeting its win condition has no winner, and the
-  // summary must not invent one.
-  const winner: TeamSide | null = result
-    ? result.winner
-    : state.score.home === state.score.visitor
-      ? null
-      : state.score.home > state.score.visitor
-        ? 'home'
-        : 'visitor'
+  // Only a completed set has a winner. A set still being played has a leader, which
+  // is not the same fact: naming the team ahead at 10-8 writes a result the match has
+  // not produced. A set ended without meeting its win condition has no winner either,
+  // so an unfinished summary stays blank rather than inventing one.
+  const winner: TeamSide | null = result?.winner ?? null
 
   return (
     <div className="screen sheet-view">

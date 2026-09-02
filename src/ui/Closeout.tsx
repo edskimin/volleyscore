@@ -33,8 +33,19 @@ export default function Closeout({
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<Record<string, boolean>>({})
 
-  const winner: TeamSide = state.setsWon.home > state.setsWon.visitor ? 'home' : 'visitor'
-  const decided = state.setsWon.home !== state.setsWon.visitor
+  // A lead is not a result. Sets won differing says only who is ahead: in a best of
+  // five, 2-1 is a lead and the match is still on. matchComplete is the fold's own
+  // answer, and it knows the format, so it is the only thing allowed to declare a
+  // winner on the artifact that gets kept.
+  const leader: TeamSide | null =
+    state.setsWon.home > state.setsWon.visitor
+      ? 'home'
+      : state.setsWon.visitor > state.setsWon.home
+        ? 'visitor'
+        : null
+  // Complete AND a leader: MATCH_ENDED can finish a match level, and that has no
+  // winner either.
+  const winner: TeamSide | null = state.matchComplete ? leader : null
 
   async function runExport() {
     setBusy(true)
@@ -59,7 +70,7 @@ export default function Closeout({
 
       <section className="card result">
         <div className="result-head">
-          {decided ? (
+          {winner ? (
             <>
               <b>{setup[winner].name}</b>
               <span className="muted">wins</span>

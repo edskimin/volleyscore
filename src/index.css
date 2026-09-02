@@ -425,6 +425,12 @@ button {
 
 /* --- Set setup validation ------------------------------------------------ */
 
+/* Changing the format rewrites which sets counted, without writing an event. The
+   only warning the operator gets is this one, so it carries the attention token. */
+.format-warning { border-color: var(--flag-amber); display: grid; gap: 0.4rem; }
+.format-warning .section-title { color: var(--flag-amber); }
+.format-warning p { margin: 0; font-size: 0.9rem; }
+
 .problems { border-color: var(--flag-amber); display: grid; gap: 0.4rem; }
 .problems b { font-size: 0.9rem; font-weight: 650; color: var(--flag-amber); }
 .problems ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; font-size: 0.87rem; color: var(--fg-dim); }

@@ -188,12 +188,19 @@ export default function InMatch(props: Props) {
     setSel({ side, kind: 'cell', value: slot })
   }
 
+  // Between sets the screen stays reachable, deliberately: it is where undo lives and
+  // where the last set can be read back. But nothing here can be scored into a set
+  // that has not started. Every control that writes an event is off, so a stray tap on
+  // the way to the next set cannot put an inert rally or timeout in the log, which is
+  // the source of truth and gets exported.
+  const live = state.setInProgress
+
   // Completed results only. A set ended without meeting its win condition has no
   // result, and listing it as one more score reads at a glance like a set someone won.
   const played = state.completedSets.filter((s) => s.winner !== null)
   const setLine = [
     ...played.map((s) => `${s.score.home}\u2013${s.score.visitor}`),
-    'in progress',
+    ...(live ? ['in progress'] : []),
   ].join(' \u00b7 ')
 
   const endTime = () => new Date().toTimeString().slice(0, 5)
@@ -211,6 +218,22 @@ export default function InMatch(props: Props) {
       : null
   const matchOver = state.matchComplete && !matchEnded
 
+  // One primary per layer, and between sets it is the way forward rather than a
+  // scoring control the screen can no longer honour.
+  const primary: { label: string; run: () => void } | null = matchOver
+    ? { label: 'end match', run: props.onCloseout }
+    : !live
+      ? { label: 'start next set', run: props.onSetEnded }
+      : setWinner
+        ? {
+            label: 'end set',
+            run: () => {
+              append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
+              props.onSetEnded()
+            },
+          }
+        : null
+
   let status: string | null = null
   if (matchOver) {
     status =
@@ -222,6 +245,12 @@ export default function InMatch(props: Props) {
       `${setup[setWinner].name} wins set ${state.currentSet}, ` +
       `${Math.max(state.score.home, state.score.visitor)}\u2013` +
       `${Math.min(state.score.home, state.score.visitor)}`
+  } else if (!live) {
+    const last = state.completedSets[state.completedSets.length - 1]
+    status = last
+      ? `Set ${last.setNumber} ended ${last.score.home}\u2013${last.score.visitor}. ` +
+        'The court below is that set as it finished; scoring resumes with the next set.'
+      : 'No set has started. Scoring resumes with the first set.'
   }
 
   // Scrim tap and Escape both dismiss.
@@ -277,7 +306,7 @@ export default function InMatch(props: Props) {
             background: bg,
             ...(blocked ? { opacity: 0.28, cursor: 'default' } : null),
           }}
-          disabled={blocked}
+          disabled={blocked || !live}
           onClick={() => tapCell(side, idx)}
         >
           <div className="cell-top" style={{ color: sub }}>
@@ -327,7 +356,7 @@ export default function InMatch(props: Props) {
           className="chip"
           data-state={state_}
           style={{ background: bg, color: fg, borderColor: bd }}
-          disabled={here || !eligible}
+          disabled={here || !eligible || !live}
           onClick={() => tapChip(side, j)}
         >
           {isLibero(j) && <Triangle em="0.75em" color={fg} />}
@@ -379,7 +408,11 @@ export default function InMatch(props: Props) {
           </span>
         </div>
         <div className="panel-body">
-          <button className="score-block" onClick={() => append({ type: 'RALLY_WON', team: side })}>
+          <button
+            className="score-block"
+            disabled={!live}
+            onClick={() => append({ type: 'RALLY_WON', team: side })}
+          >
             <span className="score-value" style={{ color: p.ink }}>
               {state.score[side]}
             </span>
@@ -420,21 +453,15 @@ export default function InMatch(props: Props) {
           </div>
           <div className="rail-right">
             {/* The one filled control in the app, and only ever one at a time. */}
+            {/* MATCH_ENDED is written by the route into closeout, not here: one
+                place to record finishing means every way in records it once. */}
             <button
               className="btn btn-primary"
-              hidden={!matchOver && setWinner === null}
+              hidden={primary === null}
               style={{ padding: '0.9cqh 1.6cqh' }}
-              onClick={() => {
-                if (matchOver) {
-                  append({ type: 'MATCH_ENDED', endTime: endTime() })
-                  props.onCloseout()
-                } else {
-                  append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
-                  props.onSetEnded()
-                }
-              }}
+              onClick={() => primary?.run()}
             >
-              {matchOver ? 'end match' : 'end set'}
+              {primary?.label}
             </button>
             <span className="rail-clock">{clock}</span>
             <span className="rail-icon" title="Saved on this device" aria-label="Saved on this device">
@@ -468,7 +495,7 @@ export default function InMatch(props: Props) {
             <button
               className="btn"
               style={{ borderColor: palettes[teamAt('left')].rule }}
-              disabled={state.teams[teamAt('left')].timeoutsUsed >= MAX_TIMEOUTS}
+              disabled={!live || state.teams[teamAt('left')].timeoutsUsed >= MAX_TIMEOUTS}
               onClick={() => append({ type: 'TIMEOUT', team: teamAt('left') })}
             >
               {icons.timeout}
@@ -506,7 +533,7 @@ export default function InMatch(props: Props) {
             <button
               className="btn"
               style={{ borderColor: palettes[teamAt('right')].rule }}
-              disabled={state.teams[teamAt('right')].timeoutsUsed >= MAX_TIMEOUTS}
+              disabled={!live || state.teams[teamAt('right')].timeoutsUsed >= MAX_TIMEOUTS}
               onClick={() => append({ type: 'TIMEOUT', team: teamAt('right') })}
             >
               {icons.timeout}

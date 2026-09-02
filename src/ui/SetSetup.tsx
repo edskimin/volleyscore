@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { initialPosition } from '../model/reducer'
+import { initialPosition, setsNeededFor } from '../model/reducer'
 import { lineupProblems } from '../model/lineup'
 import {
   ROMAN,
@@ -118,8 +118,7 @@ export default function SetSetupScreen({
     lineupProblems(lineups[side], setup[side].name || side).length === 0
   const ready = complete('home') && complete('visitor')
 
-  const needed = setup.format === 'best_of_5' ? 3 : 2
-  const matchDecided = Math.max(setsWon.home, setsWon.visitor) >= needed
+  const matchDecided = Math.max(setsWon.home, setsWon.visitor) >= setsNeededFor(setup.format)
 
   /* Chip tap is the primary path: fill the active slot, advance. Six taps. */
   function tapChip(side: TeamSide, jersey: string) {

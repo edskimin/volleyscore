@@ -10,6 +10,12 @@ interface Props {
   submitLabel?: string
   /** Numbers the event log already names; these cannot be removed from a roster. */
   locked?: Record<TeamSide, Set<string>>
+  /**
+   * What changing the format would do to the match already in progress, or null if
+   * nothing. Format is the only field on this screen that rewrites a result, and it
+   * does so without writing an event, so the change is confirmed rather than blocked.
+   */
+  formatWarning?: (format: MatchSetup['format']) => string | null
   onCancel: () => void
   onStart: (setup: MatchSetup) => void
 }
@@ -209,6 +215,7 @@ export default function MatchSetupScreen({
   initial,
   title = 'New match',
   submitLabel = 'Continue',
+  formatWarning,
   locked,
   onCancel,
   onStart,
@@ -239,7 +246,19 @@ export default function MatchSetupScreen({
     home.roster.length >= 6 &&
     visitor.roster.length >= 6
 
+  const warning = useMemo(
+    () => formatWarning?.(format) ?? null,
+    [formatWarning, format],
+  )
+  // Cleared whenever the warning itself changes, so an acknowledgement never carries
+  // over to a consequence the operator has not read.
+  const [confirmed, setConfirmed] = useState<string | null>(null)
+
   function start() {
+    if (warning !== null && confirmed !== warning) {
+      setConfirmed(warning)
+      return
+    }
     onStart({
       level,
       format,
@@ -271,6 +290,18 @@ export default function MatchSetupScreen({
           {submitLabel}
         </button>
       </div>
+
+      {warning && (
+        <section className="card format-warning">
+          <h2 className="section-title">Changing the format changes the result</h2>
+          <p>{warning}</p>
+          <p className="faint">
+            {confirmed === warning
+              ? `Press ${submitLabel} again to apply it.`
+              : 'Nothing in the score log changes. The format is only how sets are counted.'}
+          </p>
+        </section>
+      )}
 
       {!ready && (
         <p className="faint requirement">

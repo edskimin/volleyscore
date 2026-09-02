@@ -1,7 +1,14 @@
 import { useState } from 'react'
 
-import { referencedNumbers } from './model/reducer'
-import { OTHER, type MatchSetup, type SetStarted, type TeamSide } from './model/types'
+import { fold, isDecidingSet, referencedNumbers } from './model/reducer'
+import {
+  OTHER,
+  type MatchEvent,
+  type MatchSetup,
+  type SetStarted,
+  type TeamSide,
+} from './model/types'
+import { routeForMatch, type Route } from './state/route'
 import { useMatchStore } from './state/store'
 import { useTheme } from './ui/theme'
 import Adjustment from './ui/Adjustment'
@@ -12,25 +19,20 @@ import InMatch from './ui/InMatch'
 import MatchSetupScreen from './ui/MatchSetup'
 import SetSetupScreen, { type SetDraft } from './ui/SetSetup'
 
-type Route =
-  | 'home'
-  | 'matchSetup'
-  | 'editSetup'
-  | 'setSetup'
-  | 'inMatch'
-  | 'sheet'
-  | 'closeout'
-  | 'adjustment'
-
 const EMPTY_LINEUP: (string | null)[] = [null, null, null, null, null, null]
 
 /**
  * Defaults for the next set. Lineups default to the previous set's, since they often
  * do not change; first serve alternates; a deciding fifth set plays to 15.
  */
-function setDefaults(setup: MatchSetup, events: SetStarted[], setNumber: number): SetDraft {
+function setDefaults(
+  setup: MatchSetup,
+  events: SetStarted[],
+  setNumber: number,
+  setsWon: Record<TeamSide, number>,
+): SetDraft {
   const last = events[events.length - 1]
-  const deciding = setup.format === 'best_of_5' && setNumber === 5
+  const deciding = isDecidingSet(setup.format, setsWon)
   return {
     setNumber,
     lineups: last
@@ -65,6 +67,77 @@ function reconcileDraft(draft: SetDraft, setup: MatchSetup): SetDraft {
     )
   }
   return { ...draft, lineups, liberos }
+}
+
+function setList(numbers: number[]): string {
+  const label = numbers.length > 1 ? 'Sets' : 'Set'
+  if (numbers.length < 3) return `${label} ${numbers.join(' and ')}`
+  return `${label} ${numbers.slice(0, -1).join(', ')} and ${numbers[numbers.length - 1]}`
+}
+
+function standing(setup: MatchSetup, setsWon: Record<TeamSide, number>): string {
+  const { home, visitor } = setsWon
+  if (home === visitor) return `${home}\u2013${visitor}, level`
+  const lead = home > visitor ? 'home' : 'visitor'
+  return `${Math.max(home, visitor)}\u2013${Math.min(home, visitor)} to ${setup[lead].name}`
+}
+
+/**
+ * What changing the format does to a match already in progress, in the terms the
+ * operator will read off the sheet.
+ *
+ * Format is a derivation input, not log data, so changing it is a legitimate
+ * correction of a mis-set match and is not blocked. But it is silent by nature: no
+ * event is written, and the only visible effect is that sets start or stop counting
+ * and the result moves. So the consequence is stated before it happens. Both sides
+ * are folded from the same events; only the format differs.
+ */
+function formatConsequence(
+  setup: MatchSetup,
+  format: MatchSetup['format'],
+  events: MatchEvent[],
+): string | null {
+  if (format === setup.format) return null
+  const label = format === 'best_of_5' ? 'best of 5' : 'best of 3'
+  const before = fold(setup, events)
+  const after = fold({ ...setup, format }, events)
+
+  const flipped = (counts: boolean) =>
+    after.completedSets
+      .filter((s) => {
+        const was = before.completedSets.find((b) => b.setNumber === s.setNumber)
+        return was !== undefined && s.counts === counts && was.counts !== counts
+      })
+      .map((s) => s.setNumber)
+
+  const parts: string[] = []
+  const nowCounts = flipped(true)
+  const nowExtra = flipped(false)
+  if (nowCounts.length > 0) {
+    const it = nowCounts.length > 1 ? 'them count' : 'it count'
+    parts.push(
+      `${setList(nowCounts)} currently ${nowCounts.length > 1 ? 'count' : 'counts'} as an extra set. Changing to ${label} will make ${it}.`,
+    )
+  }
+  if (nowExtra.length > 0) {
+    const it = nowExtra.length > 1 ? 'them extra sets' : 'it an extra set'
+    parts.push(
+      `${setList(nowExtra)} currently ${nowExtra.length > 1 ? 'count' : 'counts'} towards the match. Changing to ${label} will make ${it}.`,
+    )
+  }
+  if (
+    before.setsWon.home !== after.setsWon.home ||
+    before.setsWon.visitor !== after.setsWon.visitor
+  ) {
+    parts.push(`The match becomes ${standing(setup, after.setsWon)}.`)
+  }
+  if (before.matchComplete !== after.matchComplete) {
+    parts.push(after.matchComplete ? 'The match is decided.' : 'The match is no longer decided.')
+  }
+  if (parts.length === 0) {
+    parts.push(`Nothing already played changes. The match stays ${standing(setup, after.setsWon)}.`)
+  }
+  return parts.join(' ')
 }
 
 export default function App() {
@@ -106,17 +179,20 @@ export default function App() {
     )
   }
 
-  // Resuming: a live set goes back to the match, a decided match goes to closeout, and
-  // anything else goes to set setup. A decided match must not offer set 4.
-  const resumed: Route = store.state?.setInProgress
-    ? 'inMatch'
-    : store.state?.matchComplete
-      ? 'closeout'
-      : 'setSetup'
   // Transitions are explicit, not rewritten here. MATCH_ENDED is a state change, not
   // a termination: the in-match screen stays reachable and live afterwards so undo can
   // walk back through it, which a rewrite to closeout made impossible.
-  const view: Route = route ?? (store.record ? resumed : 'home')
+  const view: Route = route ?? routeForMatch(store.state)
+
+  // Finishing a match is an event, not navigation. Recording it here rather than on
+  // the button that happens to be nearest means every route into closeout writes it
+  // once, so the sheet's Match End time is filled in before the export is taken.
+  const goCloseout = () => {
+    if (store.record && !store.record.events.some((e) => e.type === 'MATCH_ENDED')) {
+      store.append({ type: 'MATCH_ENDED', endTime: new Date().toTimeString().slice(0, 5) })
+    }
+    setRoute('closeout')
+  }
 
 
   if (view === 'matchSetup') {
@@ -136,6 +212,7 @@ export default function App() {
   // Setup stays editable for the life of the match, because team colors are guessed
   // before the teams warm up and the in-match screen depends on telling them apart.
   if (view === 'editSetup' && store.record) {
+    const editing = store.record
     const back = store.state?.setInProgress ? 'inMatch' : 'setSetup'
     return (
       <div className="app-root">
@@ -144,6 +221,9 @@ export default function App() {
           title="Edit teams & setup"
           submitLabel="Save"
           locked={referencedNumbers(store.record.events)}
+          formatWarning={(format) =>
+            formatConsequence(editing.setup, format, editing.events)
+          }
           onCancel={() => setRoute(back)}
           onStart={async (setup) => {
             await store.updateSetup(setup)
@@ -169,7 +249,7 @@ export default function App() {
       const active =
         draft?.setNumber === setNumber
           ? draft
-          : setDefaults(record.setup, priorSets, setNumber)
+          : setDefaults(record.setup, priorSets, setNumber, state.setsWon)
       // No .app-root wrapper: this screen supplies its own .stage/.app.
       return (
         <>
@@ -191,7 +271,7 @@ export default function App() {
               setSheetFrom('setSetup')
               setRoute('sheet')
             }}
-            onCloseout={() => setRoute('closeout')}
+            onCloseout={goCloseout}
             onStart={(body) => {
               store.append(body)
               setDraft(null)
@@ -274,7 +354,7 @@ export default function App() {
               setRoute('sheet')
             }}
             onEditSetup={() => setRoute('editSetup')}
-            onCloseout={() => setRoute('closeout')}
+            onCloseout={goCloseout}
             onSetEnded={() => setRoute('setSetup')}
             onAdjust={() => setRoute('adjustment')}
             onExport={() => void store.exportMatch()}
@@ -292,7 +372,10 @@ export default function App() {
         onNew={() => setRoute('matchSetup')}
         onOpen={async (matchId) => {
           await store.open(matchId)
-          setRoute('inMatch')
+          // Clearing the route hands the decision back to routeForMatch rather than
+          // guessing here. Opening straight to the court is what made a match with no
+          // set started unopenable.
+          setRoute(null)
         }}
       />
     </div>

@@ -82,6 +82,15 @@ It looks like two sub-columns and behaves like two, but it is one table cell.
 An earlier draft of this document described four narrow columns; that was wrong.
 KHSAA uses 1-20 and 21-40 and is a different form.
 
+**The column stops at 32.** This is the paper form's own limit, not the app's, and it
+is not a bug to be fixed: a set that reaches 33 points for one team has no square to
+mark it in on a real OHSAA sheet either. It is reachable in a long deuce (a set won
+34-32 is not rare), so it will happen eventually. The app must not silently drop those
+points, and it must not renumber the column to fit them, because a printed sheet whose
+running score column disagrees with the official form is not a scoresheet. Continue
+the count in the comments field, which is what a scorer does with a pen. Not yet
+decided, and listed under Known gaps.
+
 ## The core principle
 
 **Each box represents one play or action, recorded in chronological order in the row
@@ -296,5 +305,8 @@ the match; the laptop prints it after.
   it as a small triangle appended to the number rather than enclosing it, because the
   running score column is only 28.1pt wide and an enclosing triangle collides with the
   neighbouring line. The service rows do enclose it.
+- What to do past running score 32. The column ends there on the printed form, so a
+  set decided at 34-32 has nowhere to record the last points. Continuing in the
+  comments field is the paper answer; the app currently just stops drawing.
 - Behavior if a serve order band exceeds 20 boxes. Extremely unlikely, but decide
   whether to shrink boxes or overflow into the comments.
