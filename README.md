@@ -53,6 +53,12 @@ The layout is deliberately **not** fluid. The app is locked to a 1180 by 820 sta
 every dimension is a share of the stage height in `cqh`. The proportions between the
 score, the court and the roster row are the design.
 
+**Nothing that can appear mid-match may displace the court.** A tap target that moves
+is a mis-recorded rally. The overflow menu, the hint, the add-player sheet and the set
+and match end prompts are all absolutely positioned sheets above a `--scrim`, anchored
+above the action bar. Scrim tap and Escape dismiss. This is verified: the court area
+measures 780px and its first cell sits at y 135 whether a sheet is open or closed.
+
 The other screens still use `index.css` and its older tokens. The reference's styles are
 scoped under `.app` and ours under `.app-root` so the two cannot reach each other.
 

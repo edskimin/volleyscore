@@ -28,6 +28,7 @@ Dark is the default. The theme choice persists in local storage.
 | `--control-text` | `#B8B8C2` | `#34343C` | Button labels |
 | `--control-hover` | `#1A1A21` | `#E8E8ED` | Pressed state |
 | `--cell-active-bg` | `#FFFFFF` | `#FFFFFF` | Selected or serving court cell |
+| `--scrim` | `rgba(0,0,0,0.62)` | `rgba(22,22,26,0.38)` | Behind an open sheet or menu |
 | `--flag-amber` | `#E0952A` | `#E0952A` | Rule-broken or exceptional markers |
 
 Amber is identical in both themes. It is the only accent color in the app and it
@@ -146,14 +147,28 @@ the same time.
 
 Radius encodes scale. Do not apply one radius to everything.
 
+## Overlays
+
+**Nothing that can appear mid-match may displace the court.** A tap target that moves
+is a mis-recorded rally. Sheets, menus, pickers, and the hint all float above the
+court behind a `--scrim`, anchored to whatever opened them. They never push layout.
+
+Sheets use `--rail-bg`, a 1px `--border`, and `--radius-panel`. Width is
+`min-width: var(--sheet-min)` (48cqh) and `max-width: var(--sheet-max)` (86cqh).
+A sheet anchored above the action bar sits at `bottom: 11cqh`.
+
+Tapping the scrim or pressing Escape dismisses. No shadows; the border and scrim
+carry the separation.
+
 ## Controls
 
 Buttons are outlined, never filled, except the primary action in a setup or
 confirmation flow. Padding `1.2cqh` by `2cqh`, 1.5px border, `--radius-control`.
 Icon plus label with a `0.8cqh` gap. Icons are `2.1cqh` inline SVG at 1.7 stroke width.
 
-Team-scoped buttons in the action bar carry that team's `rule` color as their border,
-so the operator knows which side a control belongs to without reading the label.
+Team-scoped buttons in the action bar carry that team's derived `rule` color as their
+border, so the operator knows which side a control belongs to without reading the
+label. Shared controls in the centre keep `--border-strong`.
 
 Minimum touch target 44px. Court cells, chips, and score areas already exceed this.
 
@@ -188,10 +203,18 @@ markers, not as fills.
 **Fix lineup mode.** Signal that normal rules are suspended by giving the working area
 an amber border. That is the only place amber appears at any size.
 
+## Status indicators
+
+The rail carries a save indicator only. There is deliberately **no offline
+indicator**: the app has no backend and no sync, so being offline changes nothing
+about whether it works or whether data is safe. An indicator for a non-problem is
+noise, and it implies a degraded state that does not exist.
+
 ## What not to do
 
 - Do not introduce a new accent color. The palette is chrome, team colors, and amber.
 - Do not use green or red for status. Red is a legitimate team color and would collide.
-- Do not add shadows. Depth comes from the surface hierarchy.
+- Do not add shadows. Depth comes from the surface hierarchy and the scrim.
+- Do not let any overlay displace the court.
 - Do not add gradients.
 - Do not use all-caps for anything other than the two structural labels named above.

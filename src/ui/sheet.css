@@ -22,7 +22,7 @@
    paper is the point. */
 .sheet-scroll { flex: 1; min-height: 0; overflow: auto; display: grid; place-items: start center; padding: 0.5rem 0; }
 
-.sheet {
+.app-root .sheet {
   --u: 1pt;
   --band: 43.52;
   --line: #000;
@@ -39,14 +39,14 @@
   box-shadow: 0 10px 40px rgb(0 0 0 / 0.55);
 }
 
-.sheet .ink { position: absolute; left: calc(30.4 * var(--u)); width: calc(727.5 * var(--u)); }
+.app-root .sheet .ink { position: absolute; left: calc(30.4 * var(--u)); width: calc(727.5 * var(--u)); }
 
 /* --- Title block --------------------------------------------------------- */
 
-.sheet-title { top: calc(28 * var(--u)); display: flex; align-items: flex-end; gap: calc(8 * var(--u)); font-size: calc(11 * var(--u)); font-weight: 700; }
-.sheet-title .rule { flex: 1; border-bottom: 1px solid var(--line); min-height: calc(13 * var(--u)); font-weight: 400; padding: 0 calc(3 * var(--u)); }
-.sheet-title .level em { font-style: normal; opacity: 0.28; }
-.sheet-title .level b { font-weight: 700; }
+.app-root .sheet-title { top: calc(28 * var(--u)); display: flex; align-items: flex-end; gap: calc(8 * var(--u)); font-size: calc(11 * var(--u)); font-weight: 700; }
+.app-root .sheet-title .rule { flex: 1; border-bottom: 1px solid var(--line); min-height: calc(13 * var(--u)); font-weight: 400; padding: 0 calc(3 * var(--u)); }
+.app-root .sheet-title .level em { font-style: normal; opacity: 0.28; }
+.app-root .sheet-title .level b { font-weight: 700; }
 
 .sheet-officials { top: calc(56 * var(--u)); display: flex; align-items: flex-end; gap: calc(8 * var(--u)); font-size: calc(9 * var(--u)); font-weight: 700; }
 .sheet-officials .rule { flex: 1; border-bottom: 1px solid var(--line); min-height: calc(12 * var(--u)); font-weight: 400; padding: 0 calc(3 * var(--u)); text-align: center; }
@@ -181,8 +181,8 @@
 @media print {
   @page { size: letter landscape; margin: 0; }
   body { background: #fff; }
-  .app > .screen > *:not(.sheet-scroll) { display: none !important; }
+  .app-root > .screen > *:not(.sheet-scroll) { display: none !important; }
   .sheet-scroll { overflow: visible; padding: 0; }
   .sheet-scale { transform: none !important; }
-  .sheet { box-shadow: none; }
+  .app-root .sheet { box-shadow: none; }
 }

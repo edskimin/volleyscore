@@ -76,9 +76,6 @@ const icons = {
   save: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 4h9l5 5v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" /><path d="M8 4v5h6" /><circle cx="12" cy="15" r="2" /></svg>
   ),
-  offline: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M3 3l18 18" /><path d="M9.5 17.5a3.5 3.5 0 0 1 5 0" /><path d="M6 14a8 8 0 0 1 3-2" /><path d="M18 14a8 8 0 0 0-6.5-2.3" /></svg>
-  ),
   timeout: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8" /><path d="M12 9v4" /><path d="M9 2h6" /></svg>
   ),
@@ -107,8 +104,10 @@ const HINT =
 export default function InMatch(props: Props) {
   const { setup, state, events, append, undoLast, canUndo, theme } = props
   const [sel, setSel] = useState<Selection>(null)
-  const [panel, setPanel] = useState<'none' | 'hint' | 'menu'>('none')
-  const [adding, setAdding] = useState<TeamSide | null>(null)
+  /** One overlay at a time. Null means the court is unobstructed. */
+  type Overlay = 'menu' | 'hint' | 'set-end' | 'match-end' | 'add-home' | 'add-visitor'
+  const [opened, setOpened] = useState<Overlay | null>(null)
+  const [dismissedEnd, setDismissedEnd] = useState<string | null>(null)
   const [newNumber, setNewNumber] = useState('')
 
   const [clock, setClock] = useState(() => new Date().toTimeString().slice(0, 5))
@@ -122,6 +121,7 @@ export default function InMatch(props: Props) {
     document.body.classList.add('in-match-host')
     return () => document.body.classList.remove('in-match-host')
   }, [])
+
 
   const palettes: Record<TeamSide, TeamPalette> = useMemo(
     () => ({
@@ -158,6 +158,40 @@ export default function InMatch(props: Props) {
   const endTime = () => new Date().toTimeString().slice(0, 5)
   const matchWinner: TeamSide = state.setsWon.home > state.setsWon.visitor ? 'home' : 'visitor'
   const matchEnded = events.some((e) => e.type === 'MATCH_ENDED')
+
+  // A finished set or match raises its own prompt, but "Not yet" has to stick. The
+  // token changes when the situation does, so undoing and re-reaching set point asks
+  // again rather than staying silent.
+  const endToken = `${state.currentSet}:${state.score.home}:${state.score.visitor}`
+  const autoEnd: Overlay | null =
+    state.matchComplete && !matchEnded
+      ? 'match-end'
+      : state.setComplete && state.setInProgress
+        ? 'set-end'
+        : null
+  const overlay: Overlay | null =
+    opened ?? (autoEnd && dismissedEnd !== endToken ? autoEnd : null)
+
+  function setOverlay(next: Overlay | null | ((v: Overlay | null) => Overlay | null)) {
+    const value = typeof next === 'function' ? next(overlay) : next
+    setOpened(value)
+    // Closing also silences the automatic prompt for this exact situation.
+    if (value === null && autoEnd) setDismissedEnd(endToken)
+  }
+
+  // Scrim tap and Escape both dismiss. Declared after the derivations it reads.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setOpened(null)
+      if (autoEnd) setDismissedEnd(endToken)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [autoEnd, endToken])
+
+  const adding: TeamSide | null =
+    overlay === 'add-home' ? 'home' : overlay === 'add-visitor' ? 'visitor' : null
 
   function renderPanel(side: TeamSide) {
     const t = state.teams[side]
@@ -320,14 +354,16 @@ export default function InMatch(props: Props) {
           <div className="rail-left">
             <span className="rail-level">{setup.level === 'jv' ? 'JV' : setup.level}</span>
             <span className="rail-sets">{setLine}</span>
+            {state.warnings.length > 0 && (
+              <span className="rail-warn" title={state.warnings[state.warnings.length - 1]}>
+                {state.warnings[state.warnings.length - 1]}
+              </span>
+            )}
           </div>
           <div className="rail-right">
             <span className="rail-clock">{clock}</span>
             <span className="rail-icon" title="Saved on this device" aria-label="Saved on this device">
               {icons.save}
-            </span>
-            <span className="rail-icon" title="Offline" aria-label="Offline">
-              {icons.offline}
             </span>
             <button
               className="btn"
@@ -356,8 +392,7 @@ export default function InMatch(props: Props) {
           <div className="bar-group">
             <button
               className="btn"
-              data-team="home"
-              style={{ '--team-rule': palettes.home.rule } as React.CSSProperties}
+              style={{ borderColor: palettes.home.rule }}
               disabled={state.teams.home.timeoutsUsed >= MAX_TIMEOUTS}
               onClick={() => append({ type: 'TIMEOUT', team: 'home' })}
             >
@@ -366,8 +401,7 @@ export default function InMatch(props: Props) {
             </button>
             <button
               className="btn"
-              data-team="home"
-              style={{ '--team-rule': palettes.home.rule } as React.CSSProperties}
+              style={{ borderColor: palettes.home.rule }}
               onClick={() => append({ type: 'REPLAY' })}
             >
               {icons.replay}
@@ -386,7 +420,7 @@ export default function InMatch(props: Props) {
             <button
               className="btn"
               aria-label="More"
-              onClick={() => setPanel((v) => (v === 'menu' ? 'none' : 'menu'))}
+              onClick={() => setOverlay((v) => (v === 'menu' ? null : 'menu'))}
             >
               {icons.more}
             </button>
@@ -394,8 +428,7 @@ export default function InMatch(props: Props) {
           <div className="bar-group right">
             <button
               className="btn"
-              data-team="visitor"
-              style={{ '--team-rule': palettes.visitor.rule } as React.CSSProperties}
+              style={{ borderColor: palettes.visitor.rule }}
               onClick={() => append({ type: 'REPLAY' })}
             >
               {icons.replay}
@@ -403,8 +436,7 @@ export default function InMatch(props: Props) {
             </button>
             <button
               className="btn"
-              data-team="visitor"
-              style={{ '--team-rule': palettes.visitor.rule } as React.CSSProperties}
+              style={{ borderColor: palettes.visitor.rule }}
               disabled={state.teams.visitor.timeoutsUsed >= MAX_TIMEOUTS}
               onClick={() => append({ type: 'TIMEOUT', team: 'visitor' })}
             >
@@ -414,131 +446,160 @@ export default function InMatch(props: Props) {
           </div>
         </footer>
 
-        <div
-          className="hint"
-          hidden={
-            panel === 'none' &&
-            state.warnings.length === 0 &&
-            !(state.setComplete && state.setInProgress) &&
-            !(state.matchComplete && !matchEnded)
-          }
-        >
-          {state.warnings.slice(-2).map((w) => (
-            <div className="hint-row hint-warn" key={w}>
-              {w}
-            </div>
-          ))}
+        {/* Nothing that can appear mid-match may displace the court: a tap target
+            that moves is a mis-recorded rally. Everything below floats above it. */}
+        <div className="scrim" hidden={overlay === null} onClick={() => setOverlay(null)} />
 
-          {state.matchComplete && !matchEnded && (
-            <div className="hint-row">
-              <span>
-                {setup[matchWinner].name} wins the match {Math.max(state.setsWon.home, state.setsWon.visitor)}
-                &ndash;{Math.min(state.setsWon.home, state.setsWon.visitor)}
-              </span>
-              <span className="spacer" />
+        <div
+          className="sheet sheet-overflow"
+          hidden={overlay !== 'menu'}
+          role="dialog"
+          aria-label="More actions"
+        >
+          <div className="sheet-menu">
+            <button className="btn" onClick={() => { setOverlay(null); props.onAdjust() }}>
+              Fix lineup
+            </button>
+            <button className="btn" onClick={() => setOverlay('add-home')}>
+              Add player to {setup.home.name}
+            </button>
+            <button className="btn" onClick={() => setOverlay('add-visitor')}>
+              Add player to {setup.visitor.name}
+            </button>
+            <button className="btn" onClick={() => { setOverlay(null); append({ type: 'RESERVE' }) }}>
+              Re-serve
+            </button>
+            {state.setInProgress && (
               <button
                 className="btn"
                 onClick={() => {
-                  append({ type: 'MATCH_ENDED', endTime: endTime() })
-                  props.onCloseout()
+                  setOverlay(null)
+                  append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
                 }}
               >
-                End match
+                End set {state.currentSet} manually
               </button>
-            </div>
-          )}
+            )}
+            <button className="btn" onClick={() => { setOverlay(null); props.onEditSetup() }}>
+              Edit teams
+            </button>
+            <button className="btn" onClick={() => { setOverlay(null); props.onExport() }}>
+              Export
+            </button>
+            <button className="btn" onClick={() => { setOverlay(null); props.onCloseout() }}>
+              Finish match
+            </button>
+            <button className="btn" onClick={() => { setOverlay(null); props.onHome() }}>
+              Matches
+            </button>
+            <button className="btn" onClick={() => setOverlay('hint')}>
+              How this works
+            </button>
+          </div>
+        </div>
 
-          {state.setComplete && state.setInProgress && (
-            <div className="hint-row">
-              <span>
-                {state.score.home > state.score.visitor ? setup.home.name : setup.visitor.name} wins{' '}
-                {state.score.home}&ndash;{state.score.visitor}
-              </span>
-              <span className="spacer" />
-              <button
-                className="btn"
-                onClick={() =>
-                  append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
-                }
-              >
-                End set {state.currentSet}
-              </button>
-            </div>
-          )}
+        <div
+          className="sheet sheet-overflow"
+          hidden={overlay !== 'hint'}
+          role="dialog"
+          aria-label="How this screen works"
+        >
+          {HINT}
+        </div>
 
-          {panel === 'menu' && (
-            <div className="hint-row hint-actions">
-              <button className="btn" onClick={() => { props.onAdjust(); setPanel('none') }}>
-                Fix lineup
-              </button>
-              <button className="btn" onClick={() => { setAdding('home'); setPanel('none') }}>
-                Add player to {setup.home.name}
-              </button>
-              <button className="btn" onClick={() => { setAdding('visitor'); setPanel('none') }}>
-                Add player to {setup.visitor.name}
-              </button>
-              <button className="btn" onClick={() => { append({ type: 'RESERVE' }); setPanel('none') }}>
-                Re-serve
-              </button>
-              <button className="btn" onClick={() => { props.onEditSetup(); setPanel('none') }}>
-                Edit teams
-              </button>
-              <button className="btn" onClick={() => { props.onExport(); setPanel('none') }}>
-                Export
-              </button>
-              <button className="btn" onClick={() => { props.onCloseout(); setPanel('none') }}>
-                Finish match
-              </button>
-              <button className="btn" onClick={() => { props.onHome(); setPanel('none') }}>
-                Matches
-              </button>
-              <button className="btn" onClick={() => setPanel('hint')}>
-                How this works
-              </button>
-            </div>
-          )}
+        <div
+          className="sheet sheet-overflow"
+          hidden={overlay !== 'set-end'}
+          role="dialog"
+          aria-label="Set complete"
+        >
+          <div className="sheet-heading">
+            {state.score.home > state.score.visitor ? setup.home.name : setup.visitor.name} wins{' '}
+            {state.score.home}&ndash;{state.score.visitor}
+          </div>
+          Undo is still available behind this. End set {state.currentSet} only once the
+          score is right.
+          <div className="sheet-actions">
+            <span className="spacer" />
+            <button className="btn" onClick={() => setOverlay(null)}>
+              Not yet
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                setOverlay(null)
+                append({ type: 'SET_ENDED', setNumber: state.currentSet, endTime: endTime() })
+              }}
+            >
+              End set {state.currentSet}
+            </button>
+          </div>
+        </div>
 
-          {panel === 'hint' && <div className="hint-row hint-text">{HINT}</div>}
+        <div
+          className="sheet sheet-overflow"
+          hidden={overlay !== 'match-end'}
+          role="dialog"
+          aria-label="Match complete"
+        >
+          <div className="sheet-heading">
+            {setup[matchWinner].name} wins the match{' '}
+            {Math.max(state.setsWon.home, state.setsWon.visitor)}&ndash;
+            {Math.min(state.setsWon.home, state.setsWon.visitor)}
+          </div>
+          <div className="sheet-actions">
+            <span className="spacer" />
+            <button className="btn" onClick={() => setOverlay(null)}>
+              Not yet
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                setOverlay(null)
+                append({ type: 'MATCH_ENDED', endTime: endTime() })
+                props.onCloseout()
+              }}
+            >
+              End match
+            </button>
+          </div>
         </div>
 
         {adding && (
-          <div className="sheet-scrim" onClick={() => setAdding(null)}>
-            <div className="sheet" onClick={(e) => e.stopPropagation()}>
-              <span className="sheet-title">Add a player to {setup[adding].name}</span>
-              <span className="sheet-note">
-                Adding a player mid-match reflows the roster row. Prefer entering opponent
-                numbers during warmups.
-              </span>
-              <div className="sheet-row">
-                <input
-                  inputMode="numeric"
-                  autoFocus
-                  placeholder="Number"
-                  value={newNumber}
-                  maxLength={3}
-                  onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
-                />
-                <button className="btn" onClick={() => setAdding(null)}>
-                  Cancel
-                </button>
-                <button
-                  className="btn"
-                  disabled={
-                    !newNumber.trim() ||
-                    state.rosters[adding].some((p) => p.number === newNumber.trim())
-                  }
-                  onClick={() => {
-                    append({ type: 'ROSTER_ADD', team: adding, number: newNumber.trim(), name: null })
-                    setNewNumber('')
-                    setAdding(null)
-                  }}
-                >
-                  Add
-                </button>
-              </div>
+          <div className="sheet sheet-overflow" role="dialog" aria-label="Add a player">
+            <div className="sheet-heading">Add a player to {setup[adding].name}</div>
+            Adding a player mid-match reflows the roster row. Prefer entering opponent
+            numbers during warmups.
+            <div className="sheet-actions">
+              <input
+                inputMode="numeric"
+                autoFocus
+                placeholder="Number"
+                value={newNumber}
+                maxLength={3}
+                onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
+              />
+              <button className="btn" onClick={() => setOverlay(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn"
+                disabled={
+                  !newNumber.trim() ||
+                  state.rosters[adding].some((p) => p.number === newNumber.trim())
+                }
+                onClick={() => {
+                  append({ type: 'ROSTER_ADD', team: adding, number: newNumber.trim(), name: null })
+                  setNewNumber('')
+                  setOverlay(null)
+                }}
+              >
+                Add
+              </button>
             </div>
           </div>
         )}
+
       </div>
     </div>
   )

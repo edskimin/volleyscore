@@ -29,6 +29,7 @@
   --control-text:   #B8B8C2;
   --control-hover:  #1A1A21;
   --cell-active-bg: #FFFFFF;
+  --scrim:          rgba(0, 0, 0, 0.62);
 }
 
 [data-theme='light'] {
@@ -42,6 +43,7 @@
   --control-text:   #34343C;
   --control-hover:  #E8E8ED;
   --cell-active-bg: #FFFFFF;
+  --scrim:          rgba(22, 22, 26, 0.38);
 }
 
 /* The reference sets these on html/body. Scoped to the in-match route so the
@@ -64,6 +66,7 @@ body.in-match-host #root { display: flex; }
 .app {
   height: 100%;
   container-type: size;
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--app-bg);
@@ -90,6 +93,10 @@ body.in-match-host #root { display: flex; }
   --radius-cell:    1.2cqh;
   --radius-chip:    0.85cqh;
   --radius-control: 1.1cqh;
+
+  /* Overlays. Sheets float above the court; they never displace it. */
+  --sheet-min: 48cqh;
+  --sheet-max: 86cqh;
 }
 
 /* 3. CONTEXT RAIL */
@@ -313,70 +320,56 @@ body.in-match-host #root { display: flex; }
 .app .btn:disabled { opacity: 0.35; cursor: default; }
 .app .btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
-.app .hint {
-  flex: 0 0 auto;
-  padding: var(--s2) var(--s4);
-  border-top: 1px solid var(--border);
+/* ---------------------------------------------------------------------------
+   7. OVERLAYS
+   Sheets, menus, and the hint float ABOVE the court. Nothing that can appear
+   mid-match is allowed to displace the court, because a tap target that moves
+   is a mis-recorded rally.
+   --------------------------------------------------------------------------- */
+.app .scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  z-index: 20;
+}
+.app .scrim[hidden] { display: none; }
+
+.app .sheet {
+  position: absolute;
+  z-index: 21;
+  min-width: var(--sheet-min);
+  max-width: var(--sheet-max);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
   background: var(--rail-bg);
   color: var(--text-secondary);
   font-size: var(--type-label);
   line-height: 1.6;
 }
-.app .hint[hidden] { display: none; }
+.app .sheet[hidden] { display: none; }
+
+/* Anchored above the action bar, aligned to the control that opened it. */
+.app .sheet-overflow { right: var(--s4); bottom: 11cqh; }
 
 @media (prefers-reduced-motion: reduce) { .app * { transition: none !important; } }
 
 /* ---------------------------------------------------------------------------
-   7. NOT IN THE REFERENCE
-   The reference's "more" button opens a hint panel. Our screen also needs the
-   overflow actions, the set and match end prompts, the rule warnings, and the
-   add-player sheet. All of these reuse the reference's own .hint slot below the
-   action bar, so nothing steals height from the court, and every value below
-   comes from 04-design-tokens.md. No new colors.
+   8. NOT IN THE REFERENCE
+   Layout only, for sheet contents the reference does not have: the overflow
+   menu, the add-player sheet, the set and match end prompts, and the rule
+   warnings. Every value is from the spacing and type scales. No new colors,
+   radii or surfaces, and nothing here displaces the court.
    --------------------------------------------------------------------------- */
-
-/* 04: "Team-scoped buttons in the action bar carry that team's rule color as
-   their border, so the operator knows which side a control belongs to without
-   reading the label." The reference file does not do this; the tokens document
-   and both approved screenshots do. */
-.app .bar-group .btn[data-team] { border-color: var(--team-rule); }
-
-.app .hint-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  flex-wrap: wrap;
+.app .sheet-heading {
+  font-size: var(--type-body);
+  color: var(--text-primary);
+  margin-bottom: var(--s2);
 }
-.app .hint-row + .hint-row { margin-top: var(--s2); }
-.app .hint-row .spacer { flex: 1 1 auto; }
-.app .hint-actions { display: flex; gap: var(--s1); flex-wrap: wrap; }
-.app .hint-text { color: var(--text-secondary); }
-
-/* Amber means exactly one thing: something happened outside the normal rules. */
-.app .hint-warn { color: var(--flag-amber); }
-
-.app .sheet-scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--s4);
-}
-.app .sheet {
-  background: var(--rail-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  padding: var(--s4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
-  min-width: 44cqh;
-}
-.app .sheet-title { font-size: var(--type-team); font-weight: 600; color: var(--text-primary); }
-.app .sheet-note  { font-size: var(--type-label); color: var(--text-muted); line-height: 1.6; }
-.app .sheet-row   { display: flex; gap: var(--s2); align-items: center; }
+.app .sheet-menu { display: flex; flex-direction: column; gap: var(--s1); }
+.app .sheet-menu .btn { justify-content: flex-start; }
+.app .sheet-actions { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+.app .sheet-actions .spacer { flex: 1 1 auto; }
 .app .sheet input {
   flex: 1 1 auto;
   min-width: 0;
@@ -391,5 +384,12 @@ body.in-match-host #root { display: flex; }
 }
 .app .sheet input:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
-/* The stage is the positioning context for the sheet scrim. */
-.app { position: relative; }
+/* Amber means exactly one thing: something happened outside the normal rules. */
+.app .rail-left { min-width: 0; }
+.app .rail-warn {
+  color: var(--flag-amber);
+  font-size: var(--type-label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
