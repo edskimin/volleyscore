@@ -643,3 +643,33 @@ describe('ending a match is not a one-way door', () => {
     expect(backedOut.score).toEqual({ home: 25, visitor: 0 })
   })
 })
+
+describe('a tie is not a win', () => {
+  // The original bug: winner was `score.home > score.visitor ? 'home' : 'visitor'`,
+  // so any tie fell through to the else branch and was awarded to the visitor. Ending
+  // a set manually at 0-0 silently gave the opponent a set, on a screen that looked
+  // entirely plausible, and printed a sheet that reconciled internally while stating
+  // the wrong result.
+  it('awards nobody when a set is ended manually at 0-0', () => {
+    const events: MatchEvent[] = [setStarted('home')]
+    events.push(ev({ type: 'SET_ENDED', setNumber: 1, endTime: '18:03' }))
+    const s = fold(setup(), events)
+    expect(s.completedSets[0].winner).toBeNull()
+    expect(s.completedSets[0].counts).toBe(false)
+    expect(s.setsWon).toEqual({ home: 0, visitor: 0 })
+    // Specifically not the visitor, which is where the ternary used to land.
+    expect(s.setsWon.visitor).toBe(0)
+  })
+
+  it('awards nobody when a set is ended manually at a tied non-zero score', () => {
+    const events: MatchEvent[] = [setStarted('home')]
+    for (let i = 0; i < 17; i++) events.push(rally('home'))
+    for (let i = 0; i < 17; i++) events.push(rally('visitor'))
+    expect(fold(setup(), events).score).toEqual({ home: 17, visitor: 17 })
+
+    events.push(ev({ type: 'SET_ENDED', setNumber: 1, endTime: '18:40' }))
+    const s = fold(setup(), events)
+    expect(s.completedSets[0]).toMatchObject({ winner: null, counts: false })
+    expect(s.setsWon).toEqual({ home: 0, visitor: 0 })
+  })
+})

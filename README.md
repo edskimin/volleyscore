@@ -114,6 +114,12 @@ while a sheet is open nothing beneath it is actionable, so a primary in the shee
 one in the base screen are not competing and the base one is not swapped to outlined.
 Two primaries in the *same* layer means the screen has two answers to "what next".
 
+**Only genuine team actions belong in a team's side of the bar.** A time out is one; a
+replay is a referee decision about the rally and its mark goes in the current server's
+box whoever caused it, so replay and re-serve live in the overflow. **A budget is shown
+by what was spent:** each team's two time-out slots hold the score at the moment each
+was called, calling team's score first, which is what the OHSAA box wants.
+
 **A sheet anchors to the side of the thing it acts on.** Adding a player to the home
 team opens the sheet on the left, to the visiting team on the right. The screen is
 already mirrored, so a sheet that ignores that makes the title the only signal of which

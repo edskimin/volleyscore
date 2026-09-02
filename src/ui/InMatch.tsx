@@ -80,9 +80,6 @@ const icons = {
   timeout: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8" /><path d="M12 9v4" /><path d="M9 2h6" /></svg>
   ),
-  replay: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 21V4" /><path d="M5 5h13l-2.5 4L18 13H5" /></svg>
-  ),
   undo: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 13L4 9l5-4" /><path d="M4 9h9a6 6 0 0 1 0 12h-3" /></svg>
   ),
@@ -92,6 +89,40 @@ const icons = {
   more: (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="18" cy="12" r="1.7" /></svg>
   ),
+}
+
+/**
+ * A budget shown by what was spent, not by a count. Each slot holds the score at the
+ * moment that time out was called, calling team's score first, which is exactly what
+ * the OHSAA time-out box wants. Filled means spent, empty means remaining.
+ */
+function TimeoutSlots({
+  side,
+  state,
+  rule,
+}: {
+  side: TeamSide
+  state: DerivedState
+  rule: string
+}) {
+  const called = state.teams[side].timeoutScores
+  return (
+    <div className="to-slots">
+      {Array.from({ length: MAX_TIMEOUTS }, (_, i) => {
+        const t = called[i]
+        return (
+          <div
+            key={i}
+            className="to-slot"
+            data-used={t !== undefined}
+            style={{ borderColor: rule }}
+          >
+            {t ? `${t.calling}\u2013${t.opponent}` : ''}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 const HINT =
@@ -428,14 +459,7 @@ export default function InMatch(props: Props) {
               {icons.timeout}
               time out
             </button>
-            <button
-              className="btn"
-              style={{ borderColor: palettes.home.rule }}
-              onClick={() => append({ type: 'REPLAY' })}
-            >
-              {icons.replay}
-              replay
-            </button>
+            <TimeoutSlots side="home" state={state} rule={palettes.home.rule} />
           </div>
           <div className="bar-group centre">
             <button className="btn" onClick={undoLast} disabled={!canUndo}>
@@ -455,14 +479,7 @@ export default function InMatch(props: Props) {
             </button>
           </div>
           <div className="bar-group right">
-            <button
-              className="btn"
-              style={{ borderColor: palettes.visitor.rule }}
-              onClick={() => append({ type: 'REPLAY' })}
-            >
-              {icons.replay}
-              replay
-            </button>
+            <TimeoutSlots side="visitor" state={state} rule={palettes.visitor.rule} />
             <button
               className="btn"
               style={{ borderColor: palettes.visitor.rule }}
@@ -507,6 +524,11 @@ export default function InMatch(props: Props) {
                 </button>
                 <button className="btn" onClick={() => setOverlay('add-visitor')}>
                   Add player to {setup.visitor.name}
+                </button>
+                {/* Neither is a team action: the mark goes in the current server's
+                    box whoever caused it, so neither belongs in a mirrored group. */}
+                <button className="btn" onClick={() => { setOverlay(null); append({ type: 'REPLAY' }) }}>
+                  Replay
                 </button>
                 <button className="btn" onClick={() => { setOverlay(null); append({ type: 'RESERVE' }) }}>
                   Re-serve

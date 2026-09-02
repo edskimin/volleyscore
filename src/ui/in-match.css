@@ -322,6 +322,18 @@ body.stage-host #root { display: flex; }
 .app.in-match .bar-group.right  { justify-content: flex-end; }
 .app.in-match .bar-group.centre { flex: 0 0 auto; }
 
+/* Two slots per team: filled means spent, empty means remaining. The score
+   inside is the same value the OHSAA time-out box wants, calling team first. */
+.app.in-match .to-slots { display: flex; gap: var(--s1); }
+.app.in-match .to-slot {
+  min-width: 8.5cqh; height: 4.6cqh;
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius-control);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--type-label); font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.app.in-match .to-slot[data-used='true'] { color: var(--text-primary); }
+
 .app.in-match .btn {
   display: inline-flex;
   align-items: center;

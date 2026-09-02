@@ -353,6 +353,18 @@ body {
 .bar-group.right  { justify-content: flex-end; }
 .bar-group.centre { flex: 0 0 auto; }
 
+/* Two slots per team: filled means spent, empty means remaining. The score
+   inside is the same value the OHSAA time-out box wants, calling team first. */
+.to-slots { display: flex; gap: var(--s1); }
+.to-slot {
+  min-width: 8.5cqh; height: 4.6cqh;
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius-control);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--type-label); font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.to-slot[data-used="true"] { color: var(--text-primary); }
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -473,10 +485,7 @@ body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4"/><path d="M9 2h6"/></svg>
         time out
       </button>
-      <button class="btn" id="rp-home">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h13l-2.5 4L18 13H5"/></svg>
-        replay
-      </button>
+      <div class="to-slots" id="to-slots-home"></div>
     </div>
     <div class="bar-group centre">
       <button class="btn" id="undo-btn">
@@ -492,10 +501,7 @@ body {
       </button>
     </div>
     <div class="bar-group right">
-      <button class="btn" id="rp-vis">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 5h13l-2.5 4L18 13H5"/></svg>
-        replay
-      </button>
+      <div class="to-slots" id="to-slots-visitor"></div>
       <button class="btn" id="to-vis">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4"/><path d="M9 2h6"/></svg>
         time out
@@ -575,6 +581,7 @@ function makeTeam(cfg) {
     serviceTurns: cfg.serviceTurns,
     liberoOnCourt: null,
     liberoOwes: {},
+    timeouts: [],          /* up to 2, each the score when it was called */
     slotOrigin: cfg.slotOrigin || {},
     slots: cfg.lineup.map(function(n, i) {
       return { rn: RN[i], position: 0, current: n, history: [] };
@@ -802,8 +809,19 @@ function render() {
   /* Team-scoped controls carry that team's rule colour, so the operator
      knows which side a button belongs to without reading the label. */
   var ph = derivePalette(S.home.color, S.theme), pv = derivePalette(S.visitor.color, S.theme);
-  ["to-home","rp-home"].forEach(function(id){ document.getElementById(id).style.borderColor = ph.rule; });
-  ["to-vis","rp-vis"].forEach(function(id){ document.getElementById(id).style.borderColor = pv.rule; });
+  document.getElementById("to-home").style.borderColor = ph.rule;
+  document.getElementById("to-vis").style.borderColor = pv.rule;
+
+  [["home", ph], ["visitor", pv]].forEach(function(pair) {
+    var side = pair[0], pal = pair[1], t = S[side], h = "";
+    for (var i = 0; i < 2; i++) {
+      var v = t.timeouts[i];
+      h += '<div class="to-slot" data-used="' + !!v + '" style="border-color:' + pal.rule + '">' +
+           (v || "") + "</div>";
+    }
+    document.getElementById("to-slots-" + side).innerHTML = h;
+    document.getElementById(side === "home" ? "to-home" : "to-vis").disabled = t.timeouts.length >= 2;
+  });
 
   document.getElementById("set-number").textContent = S.setNumber;
   document.getElementById("match-score").textContent = S.home.sets + "\u2013" + S.visitor.sets;
@@ -840,6 +858,8 @@ function renderSheet() {
       '<div class="sheet-menu">' +
         '<button class="btn" data-open="add-home">Add player to ' + S.home.name + "</button>" +
         '<button class="btn" data-open="add-visitor">Add player to ' + S.visitor.name + "</button>" +
+        '<button class="btn" data-mark="replay">Replay</button>' +
+        '<button class="btn" data-mark="reserve">Re-serve</button>' +
       "</div>";
     return;
   }
@@ -968,6 +988,16 @@ function bind() {
   });
 }
 
+function callTimeout(side) {
+  var t = S[side], o = S[side === "home" ? "visitor" : "home"];
+  if (t.timeouts.length >= 2) return;
+  S.log.push(snapshot());
+  t.timeouts.push(t.points + "\u2013" + o.points);   /* calling team's score first */
+  render();
+}
+document.getElementById("to-home").onclick = function() { callTimeout("home"); };
+document.getElementById("to-vis").onclick  = function() { callTimeout("visitor"); };
+
 document.getElementById("undo-btn").onclick = undo;
 document.getElementById("more-btn").onclick = function() {
   S.sheet = S.sheet === "overflow" ? null : "overflow"; render();
@@ -977,9 +1007,12 @@ document.addEventListener("keydown", function(e) {
   if (e.key === "Escape" && S.sheet) { S.sheet = null; render(); }
 });
 document.getElementById("sheet").addEventListener("click", function(e) {
-  var t = e.target.closest("[data-open],[data-add],[data-sheet-close]");
+  var t = e.target.closest("[data-open],[data-add],[data-sheet-close],[data-mark]");
   if (!t) return;
   if (t.dataset.sheetClose) { S.sheet = null; return render(); }
+  /* Replay and re-serve are notation only. Neither is a team action: the mark
+     goes in the current server's box whoever caused it. */
+  if (t.dataset.mark) { S.log.push(snapshot()); S.sheet = null; return render(); }
   if (t.dataset.open) { S.sheet = t.dataset.open; return render(); }
   var side = t.dataset.add, num = document.getElementById("f-num").value.trim();
   if (!num || S[side].roster.indexOf(num) !== -1) return;
