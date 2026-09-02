@@ -4,7 +4,9 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
-    "types": ["vite/client"],
+    /* "node" is for the tests only: colors.test.ts reads the stylesheets from
+       disk so the color audit can run without a browser. */
+    "types": ["vite/client", "node"],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 

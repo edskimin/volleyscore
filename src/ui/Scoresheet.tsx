@@ -20,6 +20,8 @@ import './sheet.css'
 interface Props {
   setup: MatchSetup
   events: MatchEvent[]
+  /** Opened at a chosen set, e.g. from the closeout screen's per-set control. */
+  initialSet?: number
   onBack: () => void
 }
 
@@ -224,11 +226,11 @@ function ScoreNumber({
   )
 }
 
-export default function Scoresheet({ setup, events, onBack }: Props) {
+export default function Scoresheet({ setup, events, initialSet, onBack }: Props) {
   const sets = startedSets(events)
   // Derived rather than clamped in an effect: undoing back past a set start must not
   // leave the tab pointing at a set that no longer exists.
-  const [picked, setPicked] = useState<number | null>(null)
+  const [picked, setPicked] = useState<number | null>(initialSet ?? null)
   const setNumber = picked !== null && sets.includes(picked) ? picked : (sets[sets.length - 1] ?? 1)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)

@@ -268,9 +268,9 @@ body {
   gap: 0.7cqh;
   margin-top: var(--s3);
 }
-.panel[data-side="visitor"] .roster { direction: rtl; }
+/* The roster reads left to right on BOTH sides. Only the score, court, and
+   action bar mirror; mirroring the reading order costs more than it gains. */
 .chip {
-  direction: ltr;
   height: 5cqh;
   border-radius: var(--radius-chip);
   border: 1.5px solid transparent;

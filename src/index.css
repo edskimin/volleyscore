@@ -15,9 +15,9 @@
   --fg: #eef2f7;
   --fg-dim: #aab8c8;
   --fg-faint: #8494a5;
-  --danger: #ff6b6b;
-  --warn: #f0b429;
-  --ok: #4ade80;
+  /* No green and no red. A completed state is --fg (this ramp's --text-primary);
+     an attention state is --flag-amber, defined once in in-match.css. Both green
+     and red are legitimate team colors and would collide with a panel. */
 
   --r-sm: 8px;
   --r-md: 12px;
@@ -93,7 +93,7 @@ button {
 .app-root .btn.primary { background: var(--fg); color: var(--bg); border-color: transparent; font-weight: 600; }
 .app-root .btn.primary:hover:not(:disabled) { background: #fff; }
 .app-root .btn.ghost { background: transparent; }
-.app-root .btn.danger { color: var(--danger); }
+.app-root .btn.danger { color: var(--flag-amber); }
 .app-root .btn.lg { padding: 0.95rem 1.5rem; font-size: 1.05rem; }
 
 .field { display: grid; gap: 0.35rem; }
@@ -158,7 +158,7 @@ button {
 .empty h2 { margin: 0 0 0.4rem; font-size: 1.05rem; font-weight: 600; }
 .empty p { margin: 0; font-size: 0.9rem; }
 
-.import-error { color: var(--danger); font-size: 0.88rem; margin: 0; }
+.import-error { color: var(--flag-amber); font-size: 0.88rem; margin: 0; }
 
 .match-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .match-row {
@@ -271,10 +271,10 @@ button {
 .tag.on { background: var(--fg); color: var(--bg); border-color: transparent; }
 .tag:disabled { opacity: 0.25; cursor: default; }
 .tag.remove { background: transparent; border-color: transparent; font-size: 1.1rem; line-height: 1; }
-.tag.remove:hover { color: var(--danger); }
+.tag.remove:hover { color: var(--flag-amber); }
 
 .team-editor > footer { font-size: 0.78rem; }
-.contrast-warn { margin: 0; color: var(--warn); font-size: 0.85rem; }
+.contrast-warn { margin: 0; color: var(--flag-amber); font-size: 0.85rem; }
 
 /* --- Set setup ---------------------------------------------------------- */
 
@@ -348,9 +348,9 @@ button {
 }
 .sets td { padding: 0.35rem 0; border-top: 1px solid var(--line); }
 .sets td.num { font-weight: 600; }
-.sets td.won { color: var(--ok); font-weight: 800; }
+.sets td.won { color: var(--fg); font-weight: 800; }
 
-.export-gate { display: flex; align-items: center; gap: 1rem; border-color: var(--warn); }
+.export-gate { display: flex; align-items: center; gap: 1rem; border-color: var(--flag-amber); }
 .export-gate.done { border-color: var(--line); }
 .gate-head { display: flex; gap: 0.8rem; flex: 1; align-items: flex-start; }
 .gate-mark {
@@ -362,10 +362,11 @@ button {
   place-items: center;
   font-size: 0.8rem;
   font-weight: 800;
-  background: var(--warn);
-  color: #201700;
+  background: transparent;
+  color: var(--flag-amber);
+  border: 1px solid var(--flag-amber);
 }
-.export-gate.done .gate-mark { background: var(--ok); color: #04240f; }
+.export-gate.done .gate-mark { background: transparent; color: var(--fg); border-color: var(--fg); }
 .export-gate h2 { margin: 0 0 0.2rem; font-size: 0.95rem; font-weight: 600; }
 .export-gate p { margin: 0; font-size: 0.83rem; max-width: 52ch; }
 
@@ -374,8 +375,7 @@ button {
 
 .closeout-actions { display: flex; align-items: center; gap: 0.8rem; padding-bottom: 1rem; }
 .closeout-actions .faint { font-size: 0.83rem; }
-.set-end.match-end { border-color: var(--ok); }
-.badge.warn { background: var(--warn); color: #201700; }
+.badge.warn { background: transparent; color: var(--flag-amber); border: 1px solid var(--flag-amber); }
 .badge.quiet { background: var(--surface-3); color: var(--fg-dim); }
 
 .storage-error { max-width: 620px; margin: 0 auto; width: 100%; justify-content: center; }
@@ -389,7 +389,7 @@ button {
   background: var(--bg);
   border: 1px solid var(--line);
   font-size: 0.78rem;
-  color: var(--danger);
+  color: var(--flag-amber);
   white-space: pre-wrap;
   overflow-x: auto;
 }
@@ -397,15 +397,15 @@ button {
 
 /* --- Adjustment mode ----------------------------------------------------- */
 
-.adjust .topbar h1 { color: var(--warn); }
-.adjust-intro { display: grid; gap: 0.6rem; border-color: var(--warn); }
+.adjust .topbar h1 { color: var(--flag-amber); }
+.adjust-intro { display: grid; gap: 0.6rem; border-color: var(--flag-amber); }
 .adjust-intro p { margin: 0; font-size: 0.87rem; color: var(--fg-dim); }
 .adjust-intro ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; font-size: 0.87rem; color: var(--fg-dim); }
 .adjust-intro b { color: var(--fg); font-weight: 600; }
-.warn-line { color: var(--warn) !important; }
+.warn-line { color: var(--flag-amber) !important; }
 
-.slot.changed { outline: 1px solid var(--warn); outline-offset: -1px; }
-.slot i { font-style: normal; font-size: 0.58rem; color: var(--warn); letter-spacing: 0.04em; }
+.slot.changed { outline: 1px solid var(--flag-amber); outline-offset: -1px; }
+.slot i { font-style: normal; font-size: 0.58rem; color: var(--flag-amber); letter-spacing: 0.04em; }
 
 .serve-fix { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .confirm { display: grid; gap: 0.9rem; }
@@ -426,9 +426,11 @@ button {
 
 /* --- Set setup validation ------------------------------------------------ */
 
-.problems { border-color: var(--warn); display: grid; gap: 0.4rem; }
-.problems b { font-size: 0.9rem; font-weight: 650; color: var(--warn); }
+.problems { border-color: var(--flag-amber); display: grid; gap: 0.4rem; }
+.problems b { font-size: 0.9rem; font-weight: 650; color: var(--flag-amber); }
 .problems ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; font-size: 0.87rem; color: var(--fg-dim); }
 
-.slot.problem { outline: 2px solid var(--warn); outline-offset: -2px; }
+.slot.problem { outline: 2px solid var(--flag-amber); outline-offset: -2px; }
 .app-root .btn[aria-disabled='true'] { opacity: 0.45; }
+.sets td.sheet-link { text-align: right; padding: 0.2rem 0; }
+.sets td.sheet-link .btn { padding: 0.3rem 0.7rem; font-size: 0.8rem; }

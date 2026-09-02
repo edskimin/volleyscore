@@ -77,6 +77,9 @@ These meanings are consistent everywhere in the app. Do not introduce a fourth s
 | Filled | solid `cellBack` background | Available, tappable |
 | Outlined | transparent with `rule` border | Already in use, inert |
 | Faded to 28 percent | reduced opacity | Not tappable in this context |
+
+The roster row reads left to right on **both** sides. Only the score block, the court
+grid, and the action bar mirror. Reading order never mirrors.
 | Inverted | white background, team-colored text | Selected, or currently serving |
 
 **Dimmed always means not tappable.** There are no dimmed-but-tappable controls.
@@ -221,6 +224,10 @@ theme. It is paper. Only the chrome around it themes.
 **Home.** A list of matches, each a `--rail-bg` card. Both team colors appear as small
 markers, not as fills.
 
+**Match closeout.** Cards on `--rail-bg`. Include a direct control to open the
+scoresheet for any set, since checking the sheet before exporting is the natural last
+step. The export state is the primary action on the screen.
+
 **Fix lineup mode.** Signal that normal rules are suspended by giving the working area
 an amber border. That is the only place amber appears at any size.
 
@@ -234,7 +241,10 @@ noise, and it implies a degraded state that does not exist.
 ## What not to do
 
 - Do not introduce a new accent color. The palette is chrome, team colors, and amber.
-- Do not use green or red for status. Red is a legitimate team color and would collide.
+- Do not use green or red for status, including check marks, success badges, and
+  validation ticks. Both are legitimate team colors and will collide with a panel
+  somewhere in the app. A completed state is `--text-primary`; an attention state is
+  `--flag-amber`. Those are the only two.
 - Do not add shadows. Depth comes from the surface hierarchy and the scrim.
 - Do not let any overlay displace the court.
 - Do not put a modal in front of undo, at set point or anywhere else.

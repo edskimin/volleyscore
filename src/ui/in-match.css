@@ -70,8 +70,13 @@ body.in-match-host #root { display: flex; }
   display: flex;
   flex-direction: column;
   background: var(--app-bg);
+  color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+
+  /* The reference relies on the UA default here because its body sets no color.
+     Ours does, for the screens not yet ported, so the stage states its own or the
+     legacy text color leaks in by inheritance. */
 
   /* Every size below is a share of the stage height. */
   --s1: 0.5cqh;
@@ -240,9 +245,9 @@ body.in-match-host #root { display: flex; }
   gap: 0.7cqh;
   margin-top: var(--s3);
 }
-.app .panel[data-side='visitor'] .roster { direction: rtl; }
+/* The roster reads left to right on BOTH sides. Only the score, court, and
+   action bar mirror; mirroring the reading order costs more than it gains. */
 .app .chip {
-  direction: ltr;
   height: 5cqh;
   border-radius: var(--radius-chip);
   border: 1.5px solid transparent;

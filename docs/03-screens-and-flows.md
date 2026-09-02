@@ -79,15 +79,6 @@ Runs before every set, including set 1.
 - **Libero designation** per team for this set. May differ per set.
 - **Teams switched sides** toggle, default off.
 
-**Start set** is never disabled. A dead button cannot say what is wrong, and the
-operator is standing at the scorer's table wondering why nothing happens. Pressing it
-with an incomplete lineup names every problem in words — which slots are empty, and
-which player is in two slots at once — and outlines the offending slots. The list
-updates as each problem is fixed and disappears when the set can start.
-
-Placing a player who already holds another slot **moves** her rather than duplicating
-her, so a mis-tap is one tap to fix.
-
 Emits `SET_STARTED`.
 
 ---
@@ -270,13 +261,6 @@ Confirmation step requires:
 
 Emits one `ADJUSTMENT` event.
 
-Implementation note: `ADJUSTMENT` names a single `team`, so fixing both teams' lineups
-in one visit emits one event per changed team, at most two. The serve pointer is match
-level and rides on the first. Fixing only the serve emits a single event with
-`team: null`. Two events means two taps of undo, which is a mild deviation from
-"applied as a whole"; fixing one team, the ordinary case, is still one event and one
-undo.
-
 ---
 
 ## 7. Match closeout
@@ -285,6 +269,9 @@ Triggered when the match win condition is met, or manually.
 
 - Final score by set, match result.
 - Match end time.
+- **A direct control to open the scoresheet**, per set. Checking the sheet is the
+  natural last step before exporting, and making the operator navigate back to the
+  match screen to reach it is friction at exactly the wrong moment.
 - **Export.** Blocking. The match is not marked complete until the file has been
   shared. Do not make this a dismissible reminder; it will be dismissed. This is the
   primary protection against IndexedDB eviction.

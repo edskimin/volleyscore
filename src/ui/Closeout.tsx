@@ -9,6 +9,8 @@ interface Props {
   exportedAt: string | null
   onExport: () => Promise<void>
   onComplete: () => Promise<void>
+  /** Checking the sheet is the natural last step before exporting. */
+  onOpenSheet: (setNumber: number) => void
   /** MATCH_ENDED is a state change, not a termination. Going back must stay possible. */
   onBackToMatch: () => void
 }
@@ -24,6 +26,7 @@ export default function Closeout({
   exportedAt,
   onExport,
   onComplete,
+  onOpenSheet,
   onBackToMatch,
 }: Props) {
   const [busy, setBusy] = useState(false)
@@ -79,6 +82,7 @@ export default function Closeout({
               <th>{setup.visitor.name}</th>
               <th>Start</th>
               <th>End</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -89,6 +93,11 @@ export default function Closeout({
                 <td className={`num${s.winner === 'visitor' ? ' won' : ''}`}>{s.score.visitor}</td>
                 <td className="num faint">{s.startTime}</td>
                 <td className="num faint">{s.endTime ?? '—'}</td>
+                <td className="sheet-link">
+                  <button className="btn" onClick={() => onOpenSheet(s.setNumber)}>
+                    Scoresheet
+                  </button>
+                </td>
               </tr>
             ))}
             {state.setInProgress && (
@@ -97,6 +106,11 @@ export default function Closeout({
                 <td className="num">{state.score.home}</td>
                 <td className="num">{state.score.visitor}</td>
                 <td colSpan={2}>in progress</td>
+                <td className="sheet-link">
+                  <button className="btn" onClick={() => onOpenSheet(state.currentSet)}>
+                    Scoresheet
+                  </button>
+                </td>
               </tr>
             )}
           </tbody>

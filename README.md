@@ -67,6 +67,11 @@ outline on its court cell. Both clear by themselves when the condition does. The
 text sits in the overflow sheet. Never a toast, a banner, or a rail message: during a
 rally the operator is looking at the court, not the corner.
 
+**No green and no red, anywhere, as status.** Both are legitimate team colors and will
+collide with a panel. A completed state is the primary text color; an attention state is
+`--flag-amber`. Those are the only two, and `src/ui/colors.test.ts` enforces it by
+scanning the stylesheets, so an unsanctioned color fails the suite rather than shipping.
+
 **Nothing that can appear mid-match may displace the court.** A tap target that moves
 is a mis-recorded rally. The overflow menu, the hint, the add-player sheet and the set
 and match end prompts are all absolutely positioned sheets above a `--scrim`, anchored
@@ -87,7 +92,12 @@ npm run dev
 npm test
 ```
 
-54 tests. The reducer and selection model are pure and tested directly; the storage
+`scripts/probe.js` holds two browser probes for the in-match screen: `layoutProbe()`
+asserts no overlay displaces the court, and `colorProbe()` asserts nothing renders a
+color outside the chrome tokens, the derived team shades and `--flag-amber`. Both exist
+because a defect got past a screenshot.
+
+75 tests. The reducer and selection model are pure and tested directly; the storage
 layer runs against `fake-indexeddb`, including the version 1 to version 2 upgrade,
 which is a real regression test — reintroducing the primary key change fails it with
 Dexie's `UpgradeError`.

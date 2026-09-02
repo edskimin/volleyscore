@@ -75,6 +75,9 @@ export default function App() {
   // match itself. Resuming an in-progress match on launch is therefore not an effect
   // and never costs a second render.
   const [route, setRoute] = useState<Route | null>(null)
+  // The scoresheet can be opened at a chosen set, and returns where it came from.
+  const [sheetSet, setSheetSet] = useState<number | undefined>(undefined)
+  const [sheetFrom, setSheetFrom] = useState<Route>('inMatch')
 
   if (store.loading) return <div className="app-root" />
 
@@ -178,7 +181,11 @@ export default function App() {
             onDraftChange={setDraft}
             onBack={() => setRoute('home')}
             onEditSetup={() => setRoute('editSetup')}
-            onSheet={() => setRoute('sheet')}
+            onSheet={() => {
+              setSheetSet(undefined)
+              setSheetFrom('setSetup')
+              setRoute('sheet')
+            }}
             onCloseout={() => setRoute('closeout')}
             onStart={(body) => {
               store.append(body)
@@ -218,6 +225,11 @@ export default function App() {
               await store.complete()
               setRoute('home')
             }}
+            onOpenSheet={(setNumber) => {
+              setSheetSet(setNumber)
+              setSheetFrom('closeout')
+              setRoute('sheet')
+            }}
             onBackToMatch={() => setRoute(state.setInProgress ? 'inMatch' : 'setSetup')}
           />
         </div>
@@ -230,7 +242,8 @@ export default function App() {
           <Scoresheet
             setup={record.setup}
             events={record.events}
-            onBack={() => setRoute(state.setInProgress ? 'inMatch' : 'setSetup')}
+            initialSet={sheetSet}
+            onBack={() => setRoute(sheetFrom)}
           />
         </div>
       )
@@ -250,7 +263,11 @@ export default function App() {
             canUndo={store.canUndo}
             theme={theme}
             onToggleTheme={toggleTheme}
-            onSheet={() => setRoute('sheet')}
+            onSheet={() => {
+              setSheetSet(undefined)
+              setSheetFrom('inMatch')
+              setRoute('sheet')
+            }}
             onEditSetup={() => setRoute('editSetup')}
             onCloseout={() => setRoute('closeout')}
             onAdjust={() => setRoute('adjustment')}
