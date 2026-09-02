@@ -173,34 +173,36 @@ function colorProbe(teamHexes) {
 async function anchorProbe() {
   const app = document.querySelector('.app')
   const more = [...document.querySelectorAll('.bar-group.centre .btn')][2]
-  const sideOfPanel = (side) => {
-    const p = document.querySelector(`.panel[data-side="${side}"]`).getBoundingClientRect()
+  /* Find the panel by the team's own name, not by a home/visitor attribute: which
+     side a team occupies is now a per-set fact, so the probe must not assume one. */
+  const sideOfTeam = (name) => {
+    const panel = [...document.querySelectorAll('.panel')].find(
+      (p) => p.getAttribute('aria-label') === name,
+    )
     const a = app.getBoundingClientRect()
+    const p = panel.getBoundingClientRect()
     return p.left - a.left < a.right - p.right ? 'left' : 'right'
   }
 
   const results = []
-  for (const side of ['home', 'visitor']) {
+  for (let i = 0; i < 2; i++) {
     more.click()
     await new Promise((r) => setTimeout(r, 200))
-    const open = [...document.querySelectorAll('.sheet .btn')].find((b) =>
-      b.textContent.trim().startsWith('Add player to'),
-    )
     const buttons = [...document.querySelectorAll('.sheet .btn')].filter((b) =>
       b.textContent.trim().startsWith('Add player to'),
     )
-    buttons[side === 'home' ? 0 : 1].click()
+    const team = buttons[i].textContent.trim().replace(/^Add player to\s*/, '')
+    buttons[i].click()
     await new Promise((r) => setTimeout(r, 250))
 
     const a = app.getBoundingClientRect()
     const s = document.querySelector('.sheet:not([hidden])').getBoundingClientRect()
     const anchored = s.left - a.left < a.right - s.right ? 'left' : 'right'
-    const expected = sideOfPanel(side)
-    results.push({ side, expected, anchored, ok: anchored === expected, title: document.querySelector('.sheet-title').textContent })
+    const expected = sideOfTeam(team)
+    results.push({ team, expected, anchored, ok: anchored === expected })
 
     document.querySelector('.scrim').click()
     await new Promise((r) => setTimeout(r, 200))
-    void open
   }
   return { results, pass: results.every((r) => r.ok) }
 }

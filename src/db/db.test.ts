@@ -200,6 +200,32 @@ describe('export and import', () => {
     )
   })
 
+  it('migrates a schema 1 file, turning sidesSwitched into leftTeam', async () => {
+    const mod = await load()
+    // The old flag only drove the sheet's column order, where false put the visitor
+    // on the left. An old file must still render the way it was written.
+    const legacy = {
+      schemaVersion: 1,
+      matchId: 'old',
+      exportedAt: 'x',
+      setup: setup(),
+      events: [
+        { seq: 1, ts: 'x', type: 'SET_STARTED', setNumber: 1, sidesSwitched: false },
+        { seq: 2, ts: 'x', type: 'SET_STARTED', setNumber: 2, sidesSwitched: true },
+        { seq: 3, ts: 'x', type: 'RALLY_WON', team: 'home' },
+      ],
+    }
+    const out = mod.migrate(legacy as never)
+    expect(out.schemaVersion).toBe(mod.SCHEMA_VERSION)
+    expect(out.events.map((e) => (e as { leftTeam?: string }).leftTeam)).toEqual([
+      'visitor',
+      'home',
+      undefined,
+    ])
+    // The old field does not survive alongside the new one.
+    expect(out.events.some((e) => 'sidesSwitched' in e)).toBe(false)
+  })
+
   it('refuses a file that is not a match export', async () => {
     const mod = await load()
     await expect(mod.importMatch('{"schemaVersion":1}')).rejects.toThrow(/not a VolleyScore/)
@@ -234,5 +260,42 @@ describe('app state', () => {
 
     await mod.setActiveMatchId(null)
     expect(await mod.isInstallDismissed()).toBe(true)
+  })
+})
+
+describe('stored matches migrate too', () => {
+  it('rewrites a match already in IndexedDB, not just an imported file', async () => {
+    // A match stored before leftTeam existed folds to undefined and crashes the
+    // in-match screen, so the upgrade has to reach records already on the device.
+    const legacy = new Dexie('volleyscore')
+    legacy.version(1).stores({
+      matches: 'matchId, updatedAt, status',
+      teams: 'teamId, name, lastUsedAt',
+      appState: 'key',
+      backups: '++id, matchId, savedAt',
+    })
+    await legacy.open()
+    await legacy.table('matches').put({
+      schemaVersion: 1,
+      matchId: 'legacy',
+      createdAt: 'x',
+      updatedAt: 'x',
+      status: 'in_progress',
+      setup: setup(),
+      events: [
+        { seq: 1, ts: 'x', type: 'SET_STARTED', setNumber: 1, sidesSwitched: true },
+        { seq: 2, ts: 'x', type: 'RALLY_WON', team: 'home' },
+      ],
+    })
+    legacy.close()
+
+    const mod = await load()
+    await mod.db.open()
+    const stored = await mod.db.matches.get('legacy')
+    const started = stored?.events[0] as { leftTeam?: string; sidesSwitched?: boolean }
+    expect(started.leftTeam).toBe('home')
+    expect('sidesSwitched' in started).toBe(false)
+    expect(stored?.schemaVersion).toBe(mod.SCHEMA_VERSION)
+    mod.db.close()
   })
 })

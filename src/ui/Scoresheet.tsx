@@ -271,10 +271,11 @@ export default function Scoresheet({ setup, events, initialSet, onBack }: Props)
     )
   }
 
-  // Team names are written as the teams are positioned from the scorer's viewpoint.
-  const [leftSide, rightSide]: TeamSide[] = started.sidesSwitched
-    ? ['home', 'visitor']
-    : ['visitor', 'home']
+  // Team names are written as the teams are positioned from the scorer's viewpoint,
+  // which is exactly what leftTeam records. A later SIDES_CHANGED corrects it for the
+  // set it happened in, so read the folded value rather than the SET_STARTED field.
+  const leftSide: TeamSide = state.leftTeam
+  const rightSide: TeamSide = leftSide === 'home' ? 'visitor' : 'home'
 
   // A set that was ended without meeting its win condition has no winner, and the
   // summary must not invent one.

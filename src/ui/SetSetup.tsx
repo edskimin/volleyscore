@@ -24,7 +24,7 @@ export interface SetDraft {
   firstServe: TeamSide
   targetScore: number
   liberos: Record<TeamSide, string[]>
-  sidesSwitched: boolean
+  leftTeam: TeamSide
 }
 
 interface Props {
@@ -42,9 +42,13 @@ interface Props {
 }
 
 const SIDES: TeamSide[] = ['home', 'visitor']
-const GRID: Record<TeamSide, CourtPosition[]> = {
-  home: [5, 4, 6, 3, 1, 2],
-  visitor: [2, 1, 3, 6, 4, 5],
+type ScreenPos = 'left' | 'right'
+
+/* Keyed by screen position, so the left court's front row always faces the divider
+   whichever team is standing there. */
+const GRID: Record<ScreenPos, CourtPosition[]> = {
+  left: [5, 4, 6, 3, 1, 2],
+  right: [2, 1, 3, 6, 4, 5],
 }
 const FRONT: CourtPosition[] = [2, 3, 4]
 
@@ -100,7 +104,7 @@ export default function SetSetupScreen({
   onCloseout,
   onStart,
 }: Props) {
-  const { lineups, liberos, firstServe, targetScore, sidesSwitched } = draft
+  const { lineups, liberos, firstServe, targetScore, leftTeam } = draft
   /** Which slot the next chip fills. Transient, so it stays local. */
   const [active, setActive] = useState<Record<TeamSide, number>>({ home: 0, visitor: 0 })
 
@@ -174,14 +178,15 @@ export default function SetSetupScreen({
       setNumber: draft.setNumber,
       targetScore,
       firstServe,
-      sidesSwitched,
+      leftTeam,
       lineups: { home: lineups.home as string[], visitor: lineups.visitor as string[] },
       liberoDesignated: liberos,
       startTime: new Date().toTimeString().slice(0, 5),
     })
   }
 
-  function renderCard(side: TeamSide) {
+  function renderCard(pos: ScreenPos) {
+    const side = pos === 'left' ? leftTeam : leftTeam === 'home' ? 'visitor' : 'home'
     const snap = setup[side]
     const p = derivePalette(snap.colorPrimary, theme)
     const lineup = lineups[side]
@@ -189,8 +194,9 @@ export default function SetSetupScreen({
     const designated = snap.roster.filter((r) => snap.liberoNumbers.includes(r.number))
 
     return (
-      <section className="card" data-side={side} key={side}>
+      <section className="card" data-pos={pos} key={pos}>
         <div className="card-head" style={{ borderBottomColor: p.base }}>
+          {/* A tag on the team, not a position. */}
           <span className="card-role">{side === 'home' ? 'Home' : 'Visitor'}</span>
           <span className="card-name">{snap.name}</span>
         </div>
@@ -221,17 +227,17 @@ export default function SetSetupScreen({
           <div className="preview">
             <div className="preview-label">On court</div>
             <div className="court">
-              {GRID[side].map((pos) => {
+              {GRID[pos].map((courtPos) => {
                 let idx = -1
                 for (let i = 0; i < 6; i++) {
-                  if (initialPosition(i as SlotIndex, firstServe === side) === pos) idx = i
+                  if (initialPosition(i as SlotIndex, firstServe === side) === courtPos) idx = i
                 }
                 const n = lineup[idx]
                 return (
                   <div
-                    key={pos}
+                    key={courtPos}
                     className="pcell"
-                    style={{ background: FRONT.includes(pos) ? p.cellFront : p.cellBack }}
+                    style={{ background: FRONT.includes(courtPos) ? p.cellFront : p.cellBack }}
                   >
                     <span className="pcell-rn" style={{ color: p.inkMuted }}>
                       {ROMAN[idx]}
@@ -356,18 +362,17 @@ export default function SetSetupScreen({
             current={String(targetScore)}
             onPick={(v) => patch({ targetScore: Number(v) })}
           />
+          {/* Not "did they swap" but "where are they now": the operator scores what
+              is physically in front of them, which depends on where they are sitting. */}
           <Segment
-            label="Sides"
-            options={[
-              { v: 'same', t: 'As set 1' },
-              { v: 'switched', t: 'Switched' },
-            ]}
-            current={sidesSwitched ? 'switched' : 'same'}
-            onPick={(v) => patch({ sidesSwitched: v === 'switched' })}
+            label="On your left"
+            options={SIDES.map((s) => ({ v: s, t: setup[s].name || s }))}
+            current={leftTeam}
+            onPick={(v) => patch({ leftTeam: v as TeamSide })}
           />
         </div>
 
-        <main className="cards">{SIDES.map(renderCard)}</main>
+        <main className="cards">{(['left', 'right'] as ScreenPos[]).map(renderCard)}</main>
       </div>
     </div>
   )

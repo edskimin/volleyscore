@@ -58,7 +58,7 @@ function start(): MatchEvent[] {
       setNumber: 1,
       targetScore: 25,
       firstServe: 'home',
-      sidesSwitched: false,
+      leftTeam: 'home',
       lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
       liberoDesignated: { home: HOME_LIBEROS, visitor: [] },
       startTime: '18:00',

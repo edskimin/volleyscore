@@ -57,7 +57,7 @@ function setStarted(firstServe: TeamSide, liberos: Record<TeamSide, string[]> = 
     setNumber: 1,
     targetScore: 25,
     firstServe,
-    sidesSwitched: false,
+    leftTeam: 'home',
     lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
     liberoDesignated: liberos,
     startTime: '18:00',
@@ -563,7 +563,7 @@ describe('set and match results', () => {
           setNumber: seqSet,
           targetScore: 25,
           firstServe: 'home',
-          sidesSwitched: false,
+          leftTeam: 'home',
           lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
           liberoDesignated: { home: [], visitor: [] },
           startTime: `18:${String(seqSet).padStart(2, '0')}`,
@@ -594,7 +594,7 @@ describe('set and match results', () => {
         setNumber: 1,
         targetScore: 25,
         firstServe: 'home',
-        sidesSwitched: false,
+        leftTeam: 'home',
         lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
         liberoDesignated: { home: [], visitor: [] },
         startTime: '18:02',
@@ -608,7 +608,7 @@ describe('set and match results', () => {
         setNumber: 2,
         targetScore: 25,
         firstServe: 'visitor',
-        sidesSwitched: false,
+        leftTeam: 'home',
         lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
         liberoDesignated: { home: [], visitor: [] },
         startTime: '18:34',
@@ -671,5 +671,76 @@ describe('a tie is not a win', () => {
     const s = fold(setup(), events)
     expect(s.completedSets[0]).toMatchObject({ winner: null, counts: false })
     expect(s.setsWon).toEqual({ home: 0, visitor: 0 })
+  })
+})
+
+describe('side is a rendering fact, never an input to the fold', () => {
+  /** A match with rallies, a substitution, a libero, a timeout and a completed set. */
+  function playedMatch(leftTeam: TeamSide): MatchEvent[] {
+    seq = 0
+    const e: MatchEvent[] = [
+      ev({
+        type: 'SET_STARTED',
+        setNumber: 1,
+        targetScore: 25,
+        firstServe: 'home',
+        leftTeam,
+        lineups: { home: HOME_LINEUP, visitor: VISITOR_LINEUP },
+        liberoDesignated: { home: ['30'], visitor: [] },
+        startTime: '18:00',
+      }),
+    ]
+    e.push(
+      ev({
+        type: 'LIBERO_REPLACE',
+        team: 'home',
+        liberoNumber: '30',
+        direction: 'in',
+        slot: 4,
+        playerNumber: '15',
+      }),
+    )
+    for (let i = 0; i < 9; i++) e.push(rally(i % 3 === 0 ? 'visitor' : 'home'))
+    e.push(ev({ type: 'TIMEOUT', team: 'visitor' }))
+    e.push(
+      ev({ type: 'SUBSTITUTION', team: 'home', playerIn: '2', playerOut: '4', slot: 3, exceptional: false }),
+    )
+    for (let i = 0; i < 6; i++) e.push(rally('home'))
+    return e
+  }
+
+  /** Everything the fold derives, minus the one field that is allowed to differ. */
+  const derived = (s: ReturnType<typeof fold>) => {
+    const { leftTeam: _ignored, ...rest } = s
+    return rest
+  }
+
+  it('derives an identical state whichever team is on the left', () => {
+    const asHome = fold(setup(), playedMatch('home'))
+    const asVisitor = fold(setup(), playedMatch('visitor'))
+
+    expect(asHome.leftTeam).toBe('home')
+    expect(asVisitor.leftTeam).toBe('visitor')
+    // Score, rotation, serve, sheet rows, running score, warnings, substitutions:
+    // if any of these move, something is keying off position that should not be.
+    expect(derived(asVisitor)).toEqual(derived(asHome))
+  })
+
+  it('is unchanged by a flip in the middle of a set', () => {
+    const base = playedMatch('home')
+    const flipped = [...base]
+    // Insert the flip halfway through, where a mid-set correction would land.
+    flipped.splice(6, 0, ev({ type: 'SIDES_CHANGED', leftTeam: 'visitor' }))
+
+    const before = fold(setup(), base)
+    const after = fold(setup(), flipped)
+    expect(after.leftTeam).toBe('visitor')
+    expect(derived(after)).toEqual(derived(before))
+  })
+
+  it('lets a flip be undone like any other event', () => {
+    const events = [...playedMatch('home'), ev({ type: 'SIDES_CHANGED', leftTeam: 'visitor' })]
+    expect(fold(setup(), events).leftTeam).toBe('visitor')
+    expect(fold(setup(), undo(events)).leftTeam).toBe('home')
   })
 })

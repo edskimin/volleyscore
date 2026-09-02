@@ -208,7 +208,7 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
     setsWon: { home: 0, visitor: 0 },
     score: { home: 0, visitor: 0 },
     serveTeam: 'home',
-    sidesSwitched: false,
+    leftTeam: 'home',
     setInProgress: false,
     setComplete: false,
     matchComplete: false,
@@ -228,7 +228,8 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
         state.targetScore = ev.targetScore
         state.score = { home: 0, visitor: 0 }
         state.serveTeam = ev.firstServe
-        state.sidesSwitched = ev.sidesSwitched
+        // A record written before leftTeam existed still folds to a usable value.
+        state.leftTeam = ev.leftTeam ?? state.leftTeam
         state.setInProgress = true
         state.setComplete = false
         state.teams = {
@@ -251,6 +252,12 @@ export function fold(setup: MatchSetup, events: MatchEvent[]): DerivedState {
         }
         break
       }
+
+      // Side is a recorded fact, never an input to the fold's arithmetic. Nothing
+      // downstream of this line reads it except rendering and sheet column order.
+      case 'SIDES_CHANGED':
+        state.leftTeam = ev.leftTeam
+        break
 
       case 'RALLY_WON':
         applyRally(state, ev.team)

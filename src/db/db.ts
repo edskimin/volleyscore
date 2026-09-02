@@ -6,9 +6,9 @@
 
 import Dexie, { type EntityTable } from 'dexie'
 
-import type { MatchEvent, MatchSetup, TeamSnapshot } from '../model/types'
+import type { MatchEvent, MatchSetup, SetStarted, TeamSnapshot } from '../model/types'
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export interface MatchRecord {
   schemaVersion: number
@@ -70,6 +70,21 @@ db.version(2).stores({
   // index is safe; changing the key is not. If a key ever genuinely has to change,
   // create a new store and drop the old one instead.
   backups: '++id, matchId, savedAt, [matchId+afterSet]',
+})
+
+/**
+ * Rewrites stored matches through the event migration. Adding a version with an
+ * upgrade is safe; changing a primary key is not, which is why this does not touch
+ * `stores` at all.
+ */
+db.version(3).upgrade(async (tx) => {
+  await tx
+    .table('matches')
+    .toCollection()
+    .modify((m: MatchRecord) => {
+      m.events = migrateEvents(m.events, m.schemaVersion ?? 1)
+      m.schemaVersion = SCHEMA_VERSION
+    })
 })
 
 export { db }
@@ -219,7 +234,33 @@ export function migrate(data: MatchExport): MatchExport {
       `This file was written by a newer version of the app (schema ${data.schemaVersion}).`,
     )
   }
-  return data
+  // A malformed file must fail with the message importMatch gives, not with whatever
+  // the migration happens to throw first.
+  if (!Array.isArray(data.events)) return data
+  return {
+    ...data,
+    schemaVersion: SCHEMA_VERSION,
+    events: migrateEvents(data.events, data.schemaVersion),
+  }
+}
+
+/**
+ * 1 -> 2: SET_STARTED.sidesSwitched became leftTeam. The old flag only ever drove the
+ * sheet's column order, where false put the visitor on the left, so that is the reading
+ * that keeps an old record rendering the way it was written.
+ *
+ * This runs on imported files AND on matches already in IndexedDB, because a match
+ * stored before the change has no leftTeam and would fold to undefined.
+ */
+export function migrateEvents(events: MatchEvent[], from: number): MatchEvent[] {
+  if (from >= 2) return events
+  return events.map((e) => {
+    if (e.type !== 'SET_STARTED') return e
+    const legacy = e as SetStarted & { sidesSwitched?: boolean }
+    if (legacy.leftTeam) return e
+    const { sidesSwitched, ...rest } = legacy
+    return { ...rest, leftTeam: sidesSwitched ? 'home' : 'visitor' } as SetStarted
+  })
 }
 
 export async function importMatch(json: string): Promise<MatchRecord> {

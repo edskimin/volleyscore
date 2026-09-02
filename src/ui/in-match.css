@@ -156,6 +156,8 @@ body.stage-host #root { display: flex; }
   gap: var(--s3);
 }
 .app.in-match .panel-name { font-size: var(--type-team); font-weight: 600; }
+/* Home and visitor are tags on a team, never a position. */
+.app.in-match .panel-role { font-size: var(--type-micro); letter-spacing: 0.14em; text-transform: uppercase; margin-right: 0.8cqh; }
 .app.in-match .panel-sets { font-size: var(--type-label); }
 
 /* Score outboard, court inboard, so the two front rows face each other. */
@@ -167,9 +169,9 @@ body.stage-host #root { display: flex; }
   gap: var(--s3);
   min-height: 0;
 }
-.app.in-match .panel[data-side='visitor'] .panel-body  { flex-direction: row-reverse; }
-.app.in-match .panel[data-side='visitor'] .score-block { align-items: flex-end; }
-.app.in-match .panel[data-side='visitor'] .serve-line  { flex-direction: row-reverse; }
+.app.in-match .panel[data-pos='right'] .panel-body  { flex-direction: row-reverse; }
+.app.in-match .panel[data-pos='right'] .score-block { align-items: flex-end; }
+.app.in-match .panel[data-pos='right'] .serve-line  { flex-direction: row-reverse; }
 
 /* --- the score IS the button --- */
 .app.in-match .score-block {
@@ -390,6 +392,12 @@ body.stage-host #root { display: flex; }
   color: var(--text-secondary);
   font-size: var(--type-label);
   line-height: 1.6;
+  /* The reference's overflow menu is short enough never to reach this. Ours is not:
+     it runs to eleven entries, which overflowed the top of the stage. Cap it against
+     the same anchor it sits on and scroll inside, so nothing is unreachable and the
+     court still never moves. */
+  max-height: calc(100cqh - 11cqh - var(--s4));
+  overflow-y: auto;
 }
 .app.in-match .sheet[hidden] { display: none; }
 

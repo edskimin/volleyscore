@@ -72,8 +72,12 @@ export interface SetStarted extends EventBase {
   setNumber: number
   targetScore: number
   firstServe: TeamSide
-  /** Affects sheet column order only. */
-  sidesSwitched: boolean
+  /**
+   * Which team the scorer sees on their LEFT. Replaces a "sides switched" flag:
+   * what matters is not whether they swapped but where they are now, and the OHSAA
+   * sheet is written as the teams stand from the scorer's viewpoint.
+   */
+  leftTeam: TeamSide
   /** Ordered by serve order, not court position. Index 0 is slot I. */
   lineups: Record<TeamSide, string[]>
   liberoDesignated: Record<TeamSide, string[]>
@@ -143,6 +147,12 @@ export interface Adjustment extends EventBase {
   note: string
 }
 
+export interface SidesChanged extends EventBase {
+  type: 'SIDES_CHANGED'
+  /** Corrects which team is on the scorer's left, mid-set. */
+  leftTeam: TeamSide
+}
+
 export interface SetEnded extends EventBase {
   type: 'SET_ENDED'
   setNumber: number
@@ -164,6 +174,7 @@ export type MatchEvent =
   | Reserve
   | RosterAdd
   | Adjustment
+  | SidesChanged
   | SetEnded
   | MatchEnded
 
@@ -274,7 +285,7 @@ export interface DerivedState {
   setsWon: Record<TeamSide, number>
   score: Record<TeamSide, number>
   serveTeam: TeamSide
-  sidesSwitched: boolean
+  leftTeam: TeamSide
   setInProgress: boolean
   setComplete: boolean
   matchComplete: boolean

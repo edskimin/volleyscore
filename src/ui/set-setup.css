@@ -69,8 +69,8 @@
 /* Serve order list beside the derived court. Mirrored per side so the two
    courts sit adjacent, exactly as they do on the in-match screen. */
 .app.set-setup .card-body { flex: 0 0 auto; display: flex; gap: var(--s3); align-items: flex-start; }
-.app.set-setup .card[data-side='visitor'] .card-body { flex-direction: row-reverse; }
-.app.set-setup .card[data-side='visitor'] .card-head { text-align: right; }
+.app.set-setup .card[data-pos='right'] .card-body { flex-direction: row-reverse; }
+.app.set-setup .card[data-pos='right'] .card-head { text-align: right; }
 
 .app.set-setup .order { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.6cqh; }
 .app.set-setup .slot {

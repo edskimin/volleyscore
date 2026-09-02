@@ -41,7 +41,7 @@ function setDefaults(setup: MatchSetup, events: SetStarted[], setNumber: number)
     liberos: last
       ? { home: [...last.liberoDesignated.home], visitor: [...last.liberoDesignated.visitor] }
       : { home: [...setup.home.liberoNumbers], visitor: [...setup.visitor.liberoNumbers] },
-    sidesSwitched: false,
+    leftTeam: last?.leftTeam ?? 'home',
   }
 }
 

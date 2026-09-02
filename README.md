@@ -109,6 +109,17 @@ collide with a panel. A completed state is the primary text color; an attention 
 `--flag-amber`. Those are the only two, and `src/ui/colors.test.ts` enforces it by
 scanning the stylesheets, so an unsanctioned color fails the suite rather than shipping.
 
+**Screen position is not team role.** The two panels are the left team and the right
+team; home and visitor are tags on a team, rendered beside the name, never a position.
+The OHSAA sheet is written as the teams stand from the scorer's viewpoint, so which
+side a team occupies is a required per-set fact, recorded as `SET_STARTED.leftTeam` and
+correctable mid-set by `SIDES_CHANGED`.
+
+**Side never enters the fold's arithmetic.** Events are keyed to team identity, so a
+flip is a rendering change plus a per-set record and cannot corrupt anything. That is
+tested directly: the same match folded with either team on the left produces an
+identical derived state, and a flip inserted mid-set changes nothing but `leftTeam`.
+
 **At most one primary button per layer, not per screen.** A scrim defines a layer:
 while a sheet is open nothing beneath it is actionable, so a primary in the sheet and
 one in the base screen are not competing and the base one is not swapped to outlined.

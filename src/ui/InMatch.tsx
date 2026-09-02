@@ -35,12 +35,13 @@ interface Props {
   onHome: () => void
 }
 
-/* Court position to grid cell, row-major over two columns.
-   Home has the net on its right, so its front column is on the right.
-   Visitor mirrors, putting the two front rows against the divider. */
-const GRID: Record<TeamSide, CourtPosition[]> = {
-  home: [5, 4, 6, 3, 1, 2],
-  visitor: [2, 1, 3, 6, 4, 5],
+type ScreenPos = 'left' | 'right'
+
+/* Court position to grid cell, row-major over two columns. Keyed by SCREEN POSITION,
+   so the left court's front row always faces the divider whichever team stands there. */
+const GRID: Record<ScreenPos, CourtPosition[]> = {
+  left: [5, 4, 6, 3, 1, 2],
+  right: [2, 1, 3, 6, 4, 5],
 }
 const FRONT_ROW: CourtPosition[] = [2, 3, 4]
 
@@ -155,6 +156,11 @@ export default function InMatch(props: Props) {
   }, [])
 
 
+  const other = (id: TeamSide): TeamSide => (id === 'home' ? 'visitor' : 'home')
+  const teamAt = (pos: ScreenPos): TeamSide =>
+    pos === 'left' ? state.leftTeam : other(state.leftTeam)
+  const posOf = (id: TeamSide): ScreenPos => (state.leftTeam === id ? 'left' : 'right')
+
   const palettes: Record<TeamSide, TeamPalette> = useMemo(
     () => ({
       home: derivePalette(setup.home.colorPrimary, theme),
@@ -230,7 +236,8 @@ export default function InMatch(props: Props) {
   const adding: TeamSide | null =
     overlay === 'add-home' ? 'home' : overlay === 'add-visitor' ? 'visitor' : null
 
-  function renderPanel(side: TeamSide) {
+  function renderPanel(pos: ScreenPos) {
+    const side = teamAt(pos)
     const t = state.teams[side]
     const snap = setup[side]
     const p = palettes[side]
@@ -247,16 +254,16 @@ export default function InMatch(props: Props) {
     const budgetSpent = state.warnings.some((w) => w.side === side && w.target === 'subs')
     const sideWarned = state.warnings.some((w) => w.side === side)
 
-    const cells = GRID[side].map((pos) => {
-      const idx = t.slots.findIndex((s) => s.position === pos) as SlotIndex
+    const cells = GRID[pos].map((courtPos) => {
+      const idx = t.slots.findIndex((s) => s.position === courtPos) as SlotIndex
       const slot: Slot | undefined = t.slots[idx]
-      if (!slot) return <div key={pos} className="cell" />
-      const isServer = serving && pos === 1
+      if (!slot) return <div key={courtPos} className="cell" />
+      const isServer = serving && courtPos === 1
       const selected = selCell === idx
       const active = selected || isServer
       const bg = active
         ? 'var(--cell-active-bg)'
-        : FRONT_ROW.includes(pos)
+        : FRONT_ROW.includes(courtPos)
           ? p.cellFront
           : p.cellBack
       const fg = active ? p.onActive : p.ink
@@ -264,7 +271,7 @@ export default function InMatch(props: Props) {
       const blocked = selChip !== null && ineligibleReason(t, selChip, idx) !== null
       return (
         <button
-          key={pos}
+          key={courtPos}
           className={warned.has(idx) ? 'cell warn' : 'cell'}
           style={{
             background: bg,
@@ -352,13 +359,18 @@ export default function InMatch(props: Props) {
 
     return (
       <section
+        key={pos}
         className="panel"
-        data-side={side}
-        aria-label={side === 'home' ? 'Home team' : 'Visiting team'}
+        data-pos={pos}
+        aria-label={snap.name}
         style={{ background: serving ? p.base : p.dim }}
       >
         <div className="panel-head">
           <span className="panel-name" style={{ color: p.ink }}>
+            {/* Home and visitor are tags on a team, never a position. */}
+            <span className="panel-role" style={{ color: p.inkMuted }}>
+              {side === 'home' ? 'Home' : 'Visitor'}
+            </span>
             {snap.name}
             {sideWarned && <span className="head-flag" />}
           </span>
@@ -439,7 +451,7 @@ export default function InMatch(props: Props) {
         </header>
 
         <main className="court-area">
-          {renderPanel('home')}
+          {renderPanel('left')}
           <div className="divider">
             <span className="divider-label">Set</span>
             <span className="divider-set">{state.currentSet}</span>
@@ -448,21 +460,25 @@ export default function InMatch(props: Props) {
               {state.setsWon.home}&ndash;{state.setsWon.visitor}
             </span>
           </div>
-          {renderPanel('visitor')}
+          {renderPanel('right')}
         </main>
 
         <footer className="bar">
           <div className="bar-group">
             <button
               className="btn"
-              style={{ borderColor: palettes.home.rule }}
-              disabled={state.teams.home.timeoutsUsed >= MAX_TIMEOUTS}
-              onClick={() => append({ type: 'TIMEOUT', team: 'home' })}
+              style={{ borderColor: palettes[teamAt('left')].rule }}
+              disabled={state.teams[teamAt('left')].timeoutsUsed >= MAX_TIMEOUTS}
+              onClick={() => append({ type: 'TIMEOUT', team: teamAt('left') })}
             >
               {icons.timeout}
               time out
             </button>
-            <TimeoutSlots side="home" state={state} rule={palettes.home.rule} />
+            <TimeoutSlots
+              side={teamAt('left')}
+              state={state}
+              rule={palettes[teamAt('left')].rule}
+            />
           </div>
           <div className="bar-group centre">
             <button className="btn" onClick={undoLast} disabled={!canUndo}>
@@ -482,12 +498,16 @@ export default function InMatch(props: Props) {
             </button>
           </div>
           <div className="bar-group right">
-            <TimeoutSlots side="visitor" state={state} rule={palettes.visitor.rule} />
+            <TimeoutSlots
+              side={teamAt('right')}
+              state={state}
+              rule={palettes[teamAt('right')].rule}
+            />
             <button
               className="btn"
-              style={{ borderColor: palettes.visitor.rule }}
-              disabled={state.teams.visitor.timeoutsUsed >= MAX_TIMEOUTS}
-              onClick={() => append({ type: 'TIMEOUT', team: 'visitor' })}
+              style={{ borderColor: palettes[teamAt('right')].rule }}
+              disabled={state.teams[teamAt('right')].timeoutsUsed >= MAX_TIMEOUTS}
+              onClick={() => append({ type: 'TIMEOUT', team: teamAt('right') })}
             >
               {icons.timeout}
               time out
@@ -502,7 +522,7 @@ export default function InMatch(props: Props) {
         {/* One sheet element. Its anchor is the side of the thing it acts on, so the
             operator does not have to read the title to know which team changes. */}
         <div
-          className={`sheet ${overlay === 'add-home' ? 'sheet-left' : 'sheet-right'}`}
+          className={`sheet sheet-${adding ? posOf(adding) : 'right'}`}
           hidden={overlay === null}
           role="dialog"
           aria-label={adding ? `Add a player to ${setup[adding].name}` : 'How this screen works'}
@@ -527,6 +547,15 @@ export default function InMatch(props: Props) {
                 </button>
                 <button className="btn" onClick={() => setOverlay('add-visitor')}>
                   Add player to {setup.visitor.name}
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setOverlay(null)
+                    append({ type: 'SIDES_CHANGED', leftTeam: other(state.leftTeam) })
+                  }}
+                >
+                  Flip sides on screen
                 </button>
                 {/* Neither is a team action: the mark goes in the current server's
                     box whoever caused it, so neither belongs in a mirrored group. */}
